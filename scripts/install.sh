@@ -1,97 +1,92 @@
 #!/usr/bin/env bash
-# parrot installer.
-#   curl -fsSL https://digimata.github.io/parrot/install.sh | sh
-#
-# Fetches the latest arm64 macOS binary from GitHub Releases, drops it
-# in /usr/local/bin, and strips the quarantine xattr so Gatekeeper doesn't
-# block the unsigned binary.
-#
-# Apple Silicon only — WhisperKit uses the Apple Neural Engine via CoreML,
-# which only ships on M-series chips.
 
 set -euo pipefail
+umask 077
 
-REPO="digimata/parrot"
-BIN_NAME="parrot"
-INSTALL_DIR="/usr/local/bin"
-ASSET="parrot-macos-arm64.tar.gz"
+VERSION="${1:?usage: ./scripts/install.sh VERSION (for example 0.1.0)}"
+REPOSITORY="shadstoneofficial/regardingwork-dictate"
+ARCH="arm64"
+ASSET="regardingwork-dictate-v${VERSION}-macos-${ARCH}.zip"
+BASE_URL="https://github.com/${REPOSITORY}/releases/download/v${VERSION}"
+INSTALL_ROOT="/Applications"
+APP_NAME="RegardingWork Dictate.app"
+CLI_PATH="/usr/local/bin/regardingwork-dictate"
 
-red()    { printf "\033[31m%s\033[0m\n" "$*" >&2; }
-green()  { printf "\033[32m%s\033[0m\n" "$*"; }
-dim()    { printf "\033[2m%s\033[0m\n" "$*"; }
-
-# 1. sanity
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+    echo "invalid version: $VERSION" >&2
+    exit 64
+fi
 if [ "$(uname -s)" != "Darwin" ]; then
-    red "parrot is macOS-only (detected $(uname -s))"
+    echo "RegardingWork Dictate is macOS-only." >&2
     exit 1
 fi
-
-ARCH=$(uname -m)
-if [ "$ARCH" != "arm64" ]; then
-    red "parrot requires Apple Silicon (detected $ARCH)"
-    red "the on-device inference engine uses the Apple Neural Engine, which Intel Macs don't have."
+if [ "$(uname -m)" != "$ARCH" ]; then
+    echo "RegardingWork Dictate requires Apple Silicon." >&2
     exit 1
 fi
-
-for cmd in curl tar; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        red "missing dependency: $cmd"
+for command in curl ditto shasum codesign spctl defaults unzip; do
+    command -v "$command" >/dev/null || {
+        echo "missing dependency: $command" >&2
         exit 1
-    fi
+    }
 done
 
-# 2. resolve latest release
-dim "→ resolving latest release..."
-TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep -E '"tag_name"' \
-    | head -1 \
-    | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+TEMP_DIRECTORY="$(mktemp -d -t com.regardingwork.dictate.install)"
+trap 'rm -rf "$TEMP_DIRECTORY"' EXIT
 
-if [ -z "${TAG:-}" ]; then
-    red "couldn't determine latest release tag"
+curl --fail --location --proto '=https' --tlsv1.2 \
+    "$BASE_URL/$ASSET" -o "$TEMP_DIRECTORY/$ASSET"
+curl --fail --location --proto '=https' --tlsv1.2 \
+    "$BASE_URL/$ASSET.sha256" -o "$TEMP_DIRECTORY/$ASSET.sha256"
+if [ "$(wc -l < "$TEMP_DIRECTORY/$ASSET.sha256" | tr -d ' ')" != "1" ]; then
+    echo "checksum file must contain exactly one entry" >&2
     exit 1
 fi
-dim "  ${TAG}"
-
-URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-
-# 3. download + extract
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-
-dim "→ downloading ${ASSET}..."
-curl -fsSL "$URL" -o "$TMP/${ASSET}"
-
-dim "→ extracting..."
-tar -xzf "$TMP/${ASSET}" -C "$TMP"
-
-if [ ! -f "$TMP/${BIN_NAME}" ]; then
-    red "archive did not contain ${BIN_NAME}"
+read -r EXPECTED_DIGEST EXPECTED_NAME < "$TEMP_DIRECTORY/$ASSET.sha256"
+if ! [[ "$EXPECTED_DIGEST" =~ ^[0-9A-Fa-f]{64}$ ]] || [ "$EXPECTED_NAME" != "$ASSET" ]; then
+    echo "checksum file does not match the expected asset" >&2
     exit 1
 fi
+printf '%s  %s\n' "$EXPECTED_DIGEST" "$ASSET" > "$TEMP_DIRECTORY/verified.sha256"
+(
+    cd "$TEMP_DIRECTORY"
+    shasum -a 256 -c verified.sha256
+)
 
-chmod +x "$TMP/${BIN_NAME}"
+while IFS= read -r member; do
+    case "$member" in
+        "$APP_NAME"|"$APP_NAME/"|"$APP_NAME/"*) ;;
+        *)
+            echo "archive contains an unexpected path: $member" >&2
+            exit 1
+            ;;
+    esac
+    case "$member" in
+        /*|*"/../"*|../*|*/..) echo "archive contains an unsafe path: $member" >&2; exit 1 ;;
+    esac
+done < <(unzip -Z1 "$TEMP_DIRECTORY/$ASSET")
 
-# 4. strip quarantine so Gatekeeper lets the unsigned binary run
-xattr -d com.apple.quarantine "$TMP/${BIN_NAME}" 2>/dev/null || true
+ditto -x -k "$TEMP_DIRECTORY/$ASSET" "$TEMP_DIRECTORY/extracted"
+APP="$TEMP_DIRECTORY/extracted/$APP_NAME"
+test -x "$APP/Contents/MacOS/regardingwork-dictate"
+test "$(defaults read "$APP/Contents/Info" CFBundleIdentifier)" = "com.regardingwork.dictate"
+codesign --verify --deep --strict --verbose=2 "$APP"
+spctl --assess --type execute --verbose=2 "$APP"
 
-# 5. install
 SUDO=""
-if [ ! -w "$INSTALL_DIR" ]; then
-    if [ ! -d "$INSTALL_DIR" ]; then
-        dim "→ creating ${INSTALL_DIR} (sudo)..."
-        sudo mkdir -p "$INSTALL_DIR"
-    fi
+if [ ! -w "$INSTALL_ROOT" ] || [ ! -w "$(dirname "$CLI_PATH")" ]; then
     SUDO="sudo"
 fi
+if [ -e "$CLI_PATH" ] && [ ! -L "$CLI_PATH" ]; then
+    echo "refusing to replace non-symlink: $CLI_PATH" >&2
+    exit 1
+fi
 
-dim "→ installing to ${INSTALL_DIR}/${BIN_NAME}..."
-$SUDO mv "$TMP/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
-$SUDO chmod +x "${INSTALL_DIR}/${BIN_NAME}"
+$SUDO ditto "$APP" "$INSTALL_ROOT/$APP_NAME"
+$SUDO mkdir -p "$(dirname "$CLI_PATH")"
+$SUDO ln -sfn "$INSTALL_ROOT/$APP_NAME/Contents/MacOS/regardingwork-dictate" "$CLI_PATH"
+codesign --verify --deep --strict --verbose=2 "$INSTALL_ROOT/$APP_NAME"
+spctl --assess --type execute --verbose=2 "$INSTALL_ROOT/$APP_NAME"
 
-green "✓ parrot ${TAG} installed at ${INSTALL_DIR}/${BIN_NAME}"
-echo
-echo "next:"
-echo "  parrot setup                       # grant mic + accessibility"
-echo "  parrot install --launch-at-login   # (optional) start at login"
-echo "  parrot                             # run the daemon"
+echo "Installed signed and Gatekeeper-accepted app: $INSTALL_ROOT/$APP_NAME"
+echo "Run: regardingwork-dictate setup"
