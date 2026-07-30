@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:?set VERSION, for example VERSION=0.1.0}"
+VERSION="${VERSION:?set VERSION, for example VERSION=0.1.1}"
 ARCH="${ARCH:-arm64}"
 DIST="${DIST:-${ROOT}/dist}"
 APP="${DIST}/RegardingWork Dictate.app"

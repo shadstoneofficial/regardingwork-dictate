@@ -15,16 +15,13 @@ Use a signed, notarized pilot build installed at the stable path
 `/Applications/RegardingWork Dictate.app`. Verify the supplied checksum before
 opening it. Never remove quarantine or override Gatekeeper.
 
-```sh
-regardingwork-dictate setup
-regardingwork-dictate doctor
-regardingwork-dictate models download whisper-base.en
-regardingwork-dictate install --launch-at-login
-```
+Double-click the app and complete the visible first-run window. The app must
+request microphone and Accessibility access, show model preparation, and
+confirm when dictation is ready without requiring Terminal.
 
-In System Settings → Privacy & Security, grant microphone and Accessibility
-access to RegardingWork Dictate. Set System Settings → Keyboard → “Press 🌐
-key to” to “Do Nothing.”
+In System Settings → Privacy & Security, grant access to RegardingWork Dictate.
+The app may recommend setting System Settings → Keyboard → “Press 🌐 key to”
+to “Do Nothing,” but that preference must not make the app silently exit.
 
 ## Manual acceptance tests
 
@@ -32,19 +29,27 @@ Automated tests do not exercise macOS privacy prompts or physical input. On
 each pilot Mac:
 
 1. Confirm Gatekeeper accepts the installed app without a bypass.
-2. Confirm `doctor` reports microphone and Accessibility permission.
-3. Hold and release `fn`; verify the recording overlay transitions to
+2. Double-click the app and confirm a setup/preparation window appears
+   immediately, before model loading completes.
+3. Deny or remove a permission and confirm the app remains running with a
+   visible explanation, **Open System Settings**, and **Check Again** actions.
+4. Confirm the waveform menu item appears during preparation and offers
+   **Setup & Diagnostics…**.
+5. Confirm model preparation has a visible activity indicator and a local-data
+   explanation.
+6. Quit and double-click again; confirm it reaches ready state without Terminal.
+7. Hold and release `fn`; verify the recording overlay transitions to
    transcribing and returns to idle.
-4. Dictate into TextEdit, Safari, Messages, Slack, a terminal, and one Electron
+8. Dictate into TextEdit, Safari, Messages, Slack, a terminal, and one Electron
    app. Confirm text appears only at the active cursor.
-5. Confirm no transcript text appears in
+9. Confirm no transcript text appears in
    `~/Library/Logs/RegardingWork Dictate/`.
-6. Confirm ordinary keystrokes are not logged with modifier debugging enabled.
-7. Opt into `--dump-wav`, inspect permissions with `stat`, then delete the
+10. Confirm ordinary keystrokes are not logged with modifier debugging enabled.
+11. Opt into `--dump-wav`, inspect permissions with `stat`, then delete the
    recording and disable the option.
-8. Log out and back in; confirm the LaunchAgent starts and existing permission
+12. Log out and back in; confirm the LaunchAgent starts and existing permission
    grants remain valid.
-9. Upgrade the signed app in place and repeat the permission check.
+13. Upgrade the signed app in place and repeat the permission check.
 
 Secure password fields may reject injected text; record that as a platform
 constraint, not a reason to broaden Accessibility event capture.

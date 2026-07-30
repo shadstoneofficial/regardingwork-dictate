@@ -3,7 +3,7 @@
 set -euo pipefail
 umask 077
 
-VERSION="${1:?usage: ./scripts/install.sh VERSION (for example 0.1.0)}"
+VERSION="${1:?usage: ./scripts/install.sh VERSION (for example 0.1.1)}"
 REPOSITORY="shadstoneofficial/regardingwork-dictate"
 ARCH="arm64"
 ASSET="regardingwork-dictate-v${VERSION}-macos-${ARCH}.zip"
