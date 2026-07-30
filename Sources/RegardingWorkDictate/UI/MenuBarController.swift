@@ -1,57 +1,94 @@
 import AppKit
 
-/// Status bar item in the top-right of the menu bar. Shows recording state at
-/// a glance and provides the only persistent control surface for the daemon
-/// (since we run as `.accessory` — no dock icon, no main window).
+/// Persistent menu-bar presence. It is created before permissions or model
+/// loading so Finder launches always produce immediate, visible feedback.
 @MainActor
 final class MenuBarController {
     private let statusItem: NSStatusItem
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
-    private let modelID: String
+    private let setupItem: NSMenuItem
 
-    init(modelID: String) {
-        self.modelID = modelID
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    var onShowSetup: (() -> Void)?
+
+    init() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        stateLabel = NSMenuItem(title: "idle · hold fn to dictate", action: nil, keyEquivalent: "")
+        stateLabel = NSMenuItem(title: "starting…", action: nil, keyEquivalent: "")
         stateLabel.isEnabled = false
         menu.addItem(stateLabel)
 
-        modelLabel = NSMenuItem(title: "model: \(modelID)", action: nil, keyEquivalent: "")
+        modelLabel = NSMenuItem(title: "model: not loaded", action: nil, keyEquivalent: "")
         modelLabel.isEnabled = false
         menu.addItem(modelLabel)
 
         menu.addItem(.separator())
 
-        let quit = NSMenuItem(
+        setupItem = NSMenuItem(
+            title: "Setup & Diagnostics…",
+            action: #selector(showSetupClicked),
+            keyEquivalent: ","
+        )
+        menu.addItem(setupItem)
+
+        let quitItem = NSMenuItem(
             title: "Quit \(AppIdentity.productName)",
             action: #selector(quitClicked),
             keyEquivalent: "q"
         )
-        quit.target = self
-        menu.addItem(quit)
+        menu.addItem(quitItem)
 
+        setupItem.target = self
+        quitItem.target = self
         statusItem.menu = menu
-        configureButton(recording: false)
+
+        if let button = statusItem.button {
+            let image = NSImage(
+                systemSymbolName: "waveform",
+                accessibilityDescription: AppIdentity.productName
+            )
+            image?.isTemplate = true
+            button.image = image
+            button.toolTip = "\(AppIdentity.productName) is starting"
+        }
+    }
+
+    func setChecking() {
+        setState("checking permissions…")
+    }
+
+    func setPreparing(modelID: String) {
+        modelLabel.title = "model: \(modelID)"
+        setState("preparing on-device model…")
+    }
+
+    func setReady(modelID: String) {
+        modelLabel.title = "model: \(modelID)"
+        setState("ready · hold fn to dictate")
+    }
+
+    func setNeedsAttention(_ message: String) {
+        setState("needs attention · \(message)")
     }
 
     func setRecording(_ recording: Bool) {
-        stateLabel.title = recording ? "● recording" : "idle · hold fn to dictate"
+        setState(recording ? "● recording" : "ready · hold fn to dictate")
     }
 
     func setTranscribing() {
-        stateLabel.title = "transcribing…"
+        setState("transcribing…")
     }
 
-    private func configureButton(recording: Bool) {
-        guard let button = statusItem.button else { return }
-        let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: AppIdentity.productName)
-        image?.isTemplate = true
-        button.image = image
+    private func setState(_ title: String) {
+        stateLabel.title = title
+        statusItem.button?.toolTip = "\(AppIdentity.productName): \(title)"
+    }
+
+    @objc private func showSetupClicked() {
+        onShowSetup?()
     }
 
     @objc private func quitClicked() {

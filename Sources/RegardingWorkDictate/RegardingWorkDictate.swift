@@ -16,7 +16,7 @@ struct RegardingWorkDictate: ParsableCommand {
 struct Run: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "run",
-        abstract: "Run the daemon (default)."
+        abstract: "Run the menu-bar app (default)."
     )
 
     @Flag(name: .long, help: "Skip permission checks at startup.")
@@ -38,159 +38,26 @@ struct Run: ParsableCommand {
     var config: String?
 
     func run() throws {
-        let configURL = config.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
-            ?? AppIdentity.Paths.current.configuration
-        let storedConfig: AppConfig
-        do {
-            storedConfig = try AppConfig.load(from: configURL)
-        } catch {
-            FileHandle.standardError.write(Data("configuration error at \(configURL.path): \(error)\n".utf8))
-            throw ExitCode(78)
-        }
-        let selectedModelID = model ?? storedConfig.model
-        let debugHotkeyEnabled = debugHotkey || storedConfig.debugHotkey
-        let dumpWAVEnabled = dumpWav || storedConfig.dumpWAV
-        let overlayEnabled = !noOverlay && storedConfig.overlay
-
-        if !skipDoctor {
-            let checks = DoctorReport.run()
-            if !DoctorReport.allOK(checks) {
-                FileHandle.standardError.write(Data("startup checks failed:\n".utf8))
-                DoctorReport.print(checks)
-                FileHandle.standardError.write(Data("\nfix the above or pass --skip-doctor\n".utf8))
-                throw ExitCode(1)
-            }
-        }
-
-        guard let chosenModel = ModelRegistry.select(id: selectedModelID) else {
-            if let selectedModelID {
-                FileHandle.standardError.write(Data("unknown model: \(selectedModelID)\n".utf8))
-                FileHandle.standardError.write(Data(
-                    "run `\(AppIdentity.executableName) models list` to see options.\n".utf8
-                ))
-            } else {
-                FileHandle.standardError.write(Data("no models registered\n".utf8))
-            }
-            throw ExitCode(1)
-        }
-
-        let transcriber = WhisperKitTranscriber(model: chosenModel)
-        let warmupSemaphore = DispatchSemaphore(value: 0)
-        var warmupError: Error?
-        Task.detached {
-            do {
-                try await transcriber.warmUp()
-            } catch {
-                warmupError = error
-            }
-            warmupSemaphore.signal()
-        }
-        warmupSemaphore.wait()
-        if let warmupError {
-            FileHandle.standardError.write(Data("warmup failed: \(warmupError)\n".utf8))
-            throw ExitCode(1)
-        }
-
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let monitor = HotkeyMonitor(debug: debugHotkeyEnabled)
-        let capture = AudioCapture()
-        let overlay: RecordingOverlay? = overlayEnabled
-            ? MainActor.assumeIsolated { RecordingOverlay() }
-            : nil
-        if let overlay {
-            capture.onLevel = { level in overlay.pushLevel(level) }
+        let options = RuntimeOptions(
+            skipDoctor: skipDoctor,
+            debugHotkey: debugHotkey,
+            dumpWAV: dumpWav,
+            noOverlay: noOverlay,
+            modelID: model,
+            configurationPath: config
+        )
+        let coordinator = MainActor.assumeIsolated {
+            ApplicationCoordinator(options: options)
         }
-        let menuBar = MainActor.assumeIsolated { MenuBarController(modelID: chosenModel.id) }
-
-        do {
-            try monitor.start { event in
-                switch event {
-                case .pressed:
-                    do {
-                        try capture.start()
-                        FileHandle.standardError.write(Data("● recording\n".utf8))
-                        MainActor.assumeIsolated {
-                            overlay?.show(.recording)
-                            menuBar.setRecording(true)
-                        }
-                    } catch {
-                        FileHandle.standardError.write(Data("capture failed: \(error)\n".utf8))
-                    }
-                case .released:
-                    let samples = capture.stop()
-                    MainActor.assumeIsolated {
-                        overlay?.show(.transcribing)
-                        menuBar.setTranscribing()
-                    }
-                    let seconds = Double(samples.count) / AudioCapture.targetSampleRate
-                    let rms = computeRMS(samples)
-                    FileHandle.standardError.write(Data(
-                        String(format: "○ captured %.2fs · rms %.3f\n", seconds, rms).utf8
-                    ))
-                    if dumpWAVEnabled, !samples.isEmpty {
-                        let url = AppIdentity.Paths.current.debugWAV
-                        do {
-                            try SecureFiles.createPrivateDirectory(url.deletingLastPathComponent())
-                            try WAVWriter.write(samples: samples, sampleRate: 16_000, to: url.path)
-                            try SecureFiles.restrictFile(url)
-                            FileHandle.standardError.write(
-                                Data("  wrote private debug audio: \(url.path)\n".utf8)
-                            )
-                        } catch {
-                            FileHandle.standardError.write(Data("  wav write failed: \(error)\n".utf8))
-                        }
-                    }
-                    guard !samples.isEmpty else {
-                        MainActor.assumeIsolated {
-                            overlay?.hide()
-                            menuBar.setRecording(false)
-                        }
-                        return
-                    }
-                    Task {
-                        let started = Date()
-                        do {
-                            let text = try await transcriber.transcribe(samples)
-                            let elapsed = Date().timeIntervalSince(started)
-                            FileHandle.standardError.write(Data(
-                                String(format: "→ %.2fs · %d characters\n", elapsed, text.count).utf8
-                            ))
-                            await MainActor.run {
-                                TextInjector.inject(text)
-                                overlay?.hide()
-                                menuBar.setRecording(false)
-                            }
-                        } catch {
-                            FileHandle.standardError.write(Data("transcription failed: \(error)\n".utf8))
-                            await MainActor.run {
-                                overlay?.hide()
-                                menuBar.setRecording(false)
-                            }
-                        }
-                    }
-                }
-            }
-        } catch {
-            FileHandle.standardError.write(Data("failed to register hotkey tap: \(error)\n".utf8))
-            FileHandle.standardError.write(Data(
-                "run `\(AppIdentity.executableName) setup` to configure permissions.\n".utf8
-            ))
-            throw ExitCode(1)
+        MainActor.assumeIsolated {
+            coordinator.start()
         }
 
-        let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-        sigint.setEventHandler {
-            FileHandle.standardError.write(Data("\nshutting down\n".utf8))
-            monitor.stop()
-            NSApp.terminate(nil)
-        }
-        sigint.resume()
-        signal(SIGINT, SIG_IGN)
-
-        FileHandle.standardError.write(Data("listening on fn hold · model: \(chosenModel.id) · ^C to quit\n".utf8))
         app.run()
+        withExtendedLifetime(coordinator) {}
     }
 }
 
@@ -216,13 +83,13 @@ struct Models: ParsableCommand {
 
     struct List: ParsableCommand {
         func run() throws {
-            for m in ModelRegistry.shared {
-                let star = m.recommended ? "★" : " "
-                let id = m.id.padding(toLength: 26, withPad: " ", startingAt: 0)
-                let langs = "[\(m.languages.joined(separator: ","))]"
+            for model in ModelRegistry.shared {
+                let star = model.recommended ? "★" : " "
+                let id = model.id.padding(toLength: 26, withPad: " ", startingAt: 0)
+                let languages = "[\(model.languages.joined(separator: ","))]"
                     .padding(toLength: 9, withPad: " ", startingAt: 0)
-                let size = String(format: "%5d MB", m.sizeMB)
-                print("\(star) \(id) \(size)  \(langs)  \(m.displayName)")
+                let size = String(format: "%5d MB", model.sizeMB)
+                print("\(star) \(id) \(size)  \(languages)  \(model.displayName)")
             }
         }
     }
@@ -231,20 +98,26 @@ struct Models: ParsableCommand {
         @Argument(help: "Model id to download.") var id: String
 
         func run() throws {
-            guard let m = ModelRegistry.find(id) else {
+            guard let model = ModelRegistry.find(id) else {
                 print("unknown model: \(id)")
                 throw ExitCode(1)
             }
-            let t = WhisperKitTranscriber(model: m)
+            let transcriber = WhisperKitTranscriber(model: model)
 
-            let sem = DispatchSemaphore(value: 0)
+            let semaphore = DispatchSemaphore(value: 0)
             var capturedError: Error?
             Task.detached {
-                do { try await t.warmUp() } catch { capturedError = error }
-                sem.signal()
+                do {
+                    try await transcriber.warmUp()
+                } catch {
+                    capturedError = error
+                }
+                semaphore.signal()
             }
-            sem.wait()
-            if let e = capturedError { throw e }
+            semaphore.wait()
+            if let capturedError {
+                throw capturedError
+            }
         }
     }
 }
