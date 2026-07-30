@@ -16,6 +16,19 @@ model. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 - Microphone and Accessibility permission
 - Swift 5.9 or later for source builds
 
+## Use the Mac app
+
+1. Move `RegardingWork Dictate.app` to `/Applications`.
+2. Double-click it.
+3. Follow the visible setup window to grant microphone and Accessibility
+   permission and prepare the on-device model.
+4. When the app says it is ready, click into any text field, hold `fn`, speak,
+   and release.
+
+The waveform icon in the menu bar confirms the app is running. Its
+**Setup & Diagnostics…** menu item reopens setup or displays any startup error.
+Normal use does not require Terminal.
+
 ## Build and run
 
 ```sh
@@ -28,7 +41,7 @@ swift build -c release
 For a local unsigned app bundle:
 
 ```sh
-VERSION=0.1.0-dev ./scripts/build-app.sh
+VERSION=0.1.1-dev ./scripts/build-app.sh
 open "dist/RegardingWork Dictate.app"
 ```
 
@@ -44,9 +57,7 @@ verifies SHA-256, the bundle identifier, code signature, and Gatekeeper
 acceptance, then installs the app.
 
 ```sh
-./scripts/install.sh 0.1.0
-regardingwork-dictate setup
-regardingwork-dictate install --launch-at-login
+./scripts/install.sh 0.1.1
 ```
 
 No release is published by this repository's preparation workflow. The command
@@ -71,7 +82,8 @@ regardingwork-dictate install --uninstall
 at `.../com.regardingwork.dictate/last-capture.wav`. Transcript text is never
 written to stdout, stderr, or LaunchAgent logs.
 
-Configuration defaults to:
+The CLI remains available for development and diagnostics. Configuration
+defaults to:
 
 ```text
 ~/Library/Application Support/RegardingWork Dictate/config.json
@@ -97,7 +109,7 @@ Command-line flags take precedence over matching configuration values.
 swift build -c release
 swift test
 .build/release/regardingwork-dictate --help
-VERSION=0.1.0-dev ./scripts/build-app.sh
+VERSION=0.1.1-dev ./scripts/build-app.sh
 ```
 
 Manual microphone, hotkey, Accessibility, overlay, and text-injection checks

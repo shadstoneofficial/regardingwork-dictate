@@ -168,6 +168,21 @@ enum DoctorReport {
         }
     }
 
+    /// Only microphone and Accessibility can prevent the app from running.
+    /// The Fn system mapping may cause a competing macOS action, but it should
+    /// never make a Finder launch disappear.
+    static func runtimePermissionFailures(_ checks: [Check]) -> [Check] {
+        checks.filter { check in
+            guard check.name == "microphone" || check.name == "accessibility" else {
+                return false
+            }
+            if case .fail = check.status {
+                return true
+            }
+            return false
+        }
+    }
+
     /// True only if every check passed cleanly (used by the doctor exit code).
     static func allClean(_ checks: [Check]) -> Bool {
         checks.allSatisfy {

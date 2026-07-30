@@ -7,6 +7,23 @@ follows semantic versioning once releases begin.
 
 ### Added
 
+- Visible first-launch and recovery window for permissions, on-device model
+  preparation, readiness, and startup failures.
+- Menu-bar **Setup & Diagnostics…** action available from the beginning of
+  startup.
+
+### Changed
+
+- AppKit and the menu-bar item now start before permissions and model loading,
+  so Finder launches always produce visible state.
+- The Fn/Globe system action is advisory at runtime instead of terminating the
+  application.
+- Reopening the app brings setup or current diagnostics forward.
+
+## 0.1.0 - 2026-07-30
+
+### Added
+
 - Proper macOS application bundle with stable bundle and permission identity.
 - Developer ID signing and notarization handoff scripts.
 - Configuration, identity, path, model-selection, and transcript-sanitization
