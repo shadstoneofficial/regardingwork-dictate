@@ -33,13 +33,13 @@ enum DoctorReport {
             return Check(
                 name: "microphone",
                 status: .warn("not yet requested — will prompt on first recording"),
-                remediation: "run parrot and hold Fn once; macOS will prompt"
+                remediation: "run \(AppIdentity.executableName) and hold Fn once; macOS will prompt"
             )
         case .denied, .restricted:
             return Check(
                 name: "microphone",
                 status: .fail("denied"),
-                remediation: "System Settings → Privacy & Security → Microphone → enable for your terminal"
+                remediation: "System Settings → Privacy & Security → Microphone → enable \(permissionIdentity())"
             )
         @unknown default:
             return Check(name: "microphone", status: .fail("unknown state"), remediation: nil)
@@ -50,11 +50,10 @@ enum DoctorReport {
         if AXIsProcessTrusted() {
             return Check(name: "accessibility", status: .ok, remediation: nil)
         }
-        let parent = parentProcessName() ?? "your terminal"
         return Check(
             name: "accessibility",
             status: .fail("not granted"),
-            remediation: "System Settings → Privacy & Security → Accessibility → enable for \(parent)"
+            remediation: "System Settings → Privacy & Security → Accessibility → enable \(permissionIdentity())"
         )
     }
 
@@ -138,6 +137,13 @@ enum DoctorReport {
         return (s as NSString).lastPathComponent
     }
 
+    private static func permissionIdentity() -> String {
+        if Bundle.main.bundleIdentifier == AppIdentity.bundleIdentifier {
+            return AppIdentity.productName
+        }
+        return parentProcessName() ?? "the application that launched \(AppIdentity.executableName)"
+    }
+
     static func print(_ checks: [Check]) {
         for c in checks {
             let (mark, label): (String, String) = {
@@ -162,7 +168,7 @@ enum DoctorReport {
         }
     }
 
-    /// True only if every check passed cleanly (used by `parrot doctor` exit code).
+    /// True only if every check passed cleanly (used by the doctor exit code).
     static func allClean(_ checks: [Check]) -> Bool {
         checks.allSatisfy {
             if case .ok = $0.status { return true }

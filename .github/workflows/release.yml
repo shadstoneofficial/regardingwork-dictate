@@ -1,27 +1,35 @@
-name: release
+name: prepare macOS artifact
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer without a leading v (for example 0.1.0)
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
-    name: build arm64 macOS binary
+    name: build unsigned arm64 app for signing handoff
     runs-on: macos-15
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: swift version
-        run: swift --version
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+            echo "invalid version: $VERSION" >&2
+            exit 64
+          fi
 
-      - name: cache SwiftPM
+      - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
           path: |
@@ -30,32 +38,32 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: build
-        run: swift build -c release --arch arm64
+      - name: Test
+        run: swift test
 
-      - name: stage
+      - name: Build app and checksum
+        env:
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./scripts/package-app.sh
+
+      - name: Verify unsigned bundle identity
         run: |
-          BIN=.build/arm64-apple-macosx/release/parrot
-          file "$BIN"
-          mkdir -p dist
-          cp "$BIN" dist/parrot
+          APP="dist/RegardingWork Dictate.app"
+          test "$(defaults read "$APP/Contents/Info" CFBundleIdentifier)" = "com.regardingwork.dictate"
+          test -x "$APP/Contents/MacOS/regardingwork-dictate"
+          shasum -a 256 -c "dist/regardingwork-dictate-v${{ inputs.version }}-macos-arm64.zip.sha256"
 
-      - name: strip
-        run: strip -x dist/parrot
-
-      - name: package
-        run: |
-          cd dist
-          tar -czf parrot-macos-arm64.tar.gz parrot
-          shasum -a 256 parrot-macos-arm64.tar.gz > parrot-macos-arm64.tar.gz.sha256
-          ls -lh
-
-      - name: release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload signing-handoff artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            dist/parrot-macos-arm64.tar.gz
-            dist/parrot-macos-arm64.tar.gz.sha256
-          generate_release_notes: true
-          fail_on_unmatched_files: true
+          name: regardingwork-dictate-v${{ inputs.version }}-macos-arm64-unsigned
+          path: |
+            dist/regardingwork-dictate-v${{ inputs.version }}-macos-arm64.zip
+            dist/regardingwork-dictate-v${{ inputs.version }}-macos-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+# This workflow deliberately does not use production Apple credentials, create
+# tags, or publish GitHub releases. Follow SECURITY.md's signing handoff on the
+# trusted signing machine, then publish only with explicit approval.

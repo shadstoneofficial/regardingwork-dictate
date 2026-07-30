@@ -3,6 +3,15 @@
 *.xcodeproj
 *.xcworkspace
 .DS_Store
+dist/
+*.wav
+*.p12
+*.cer
+*.mobileprovision
+*.keychain
+*.keychain-db
+.env
+.env.*
 
 # kdb auto-rendered task index (regenerate with `kdb render`)
 .tasks/

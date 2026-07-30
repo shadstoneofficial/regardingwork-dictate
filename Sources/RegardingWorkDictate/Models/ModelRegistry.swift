@@ -43,4 +43,11 @@ enum ModelRegistry {
     static func recommended() -> TranscriptionModel? {
         shared.first { $0.recommended } ?? shared.first
     }
+
+    static func select(id: String?, from models: [TranscriptionModel] = shared) -> TranscriptionModel? {
+        if let id {
+            return models.first { $0.id == id }
+        }
+        return models.first { $0.recommended } ?? models.first
+    }
 }

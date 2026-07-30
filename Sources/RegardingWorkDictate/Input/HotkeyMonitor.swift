@@ -17,6 +17,7 @@ final class HotkeyMonitor {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isPressed = false
+    fileprivate var tapForRecovery: CFMachPort? { tap }
 
     init(mask: CGEventFlags = .maskSecondaryFn, debug: Bool = false) {
         self.mask = mask
@@ -30,15 +31,13 @@ final class HotkeyMonitor {
         let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
         if !trusted {
             FileHandle.standardError.write(Data(
-                "accessibility not granted — system prompt opened. Grant access, then quit and relaunch parrot.\n".utf8
+                "accessibility not granted — system prompt opened. Grant access, then quit and relaunch \(AppIdentity.productName).\n".utf8
             ))
             throw HotkeyError.tapCreateFailed
         }
 
-        let mask: CGEventMask =
-            (1 << CGEventType.flagsChanged.rawValue)
-            | (1 << CGEventType.keyDown.rawValue)
-            | (1 << CGEventType.keyUp.rawValue)
+        // Request modifier changes only. Dictated or typed key events are never observed.
+        let mask: CGEventMask = (1 << CGEventType.flagsChanged.rawValue)
         let userInfo = Unmanaged.passUnretained(self).toOpaque()
 
         // .cgSessionEventTap is the right level for an accessibility-granted
@@ -79,10 +78,9 @@ final class HotkeyMonitor {
     fileprivate func handle(type: CGEventType, event: CGEvent) {
         if debug {
             let flags = event.flags
-            let keycode = event.getIntegerValueField(.keyboardEventKeycode)
             FileHandle.standardError.write(
                 Data(
-                    "  [debug] type=\(type.rawValue) keycode=\(keycode) flags=\(String(flags.rawValue, radix: 16))\n"
+                    "  [debug] modifier flags=\(String(flags.rawValue, radix: 16))\n"
                         .utf8
                 ))
         }
@@ -104,8 +102,9 @@ private func hotkeyCallback(
     let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
 
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        // System disabled our tap; we'll need to re-enable. For now just no-op
-        // and let the user restart parrot.
+        if let tap = monitor.tapForRecovery {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
         return Unmanaged.passUnretained(event)
     }
 

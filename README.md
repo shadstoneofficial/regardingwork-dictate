@@ -1,59 +1,112 @@
-# parrot
+# RegardingWork Dictate
 
-A minimal macOS dictation daemon. Push-to-talk, on-device transcription, text inserted at the cursor.
+RegardingWork Dictate is a private, on-device macOS push-to-talk dictation app
+in the RegardingWork Voice product family. Hold `fn`, speak, and release to
+insert the transcript at the active cursor.
 
-## Install
+Audio and transcription stay on the Mac. The app has no telemetry, server,
+Railway service, transcript history, or cloud transcription provider. Network
+access is used only to download build dependencies and the selected WhisperKit
+model. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
-```sh
-curl -fsSL https://digimata.github.io/parrot/install.sh | sh
-parrot setup                       # grants mic + accessibility, downloads the model
-parrot install --launch-at-login   # optional — runs in the background on login
-```
+## Requirements
 
-**Requires:** macOS 14+ on Apple Silicon (M1 or newer). Transcription runs on the Apple Neural Engine via CoreML — so the installer refuses to run on Intel.
+- macOS 14 or later
+- Apple Silicon
+- Microphone and Accessibility permission
+- Swift 5.9 or later for source builds
 
-The installer drops the binary in `/usr/local/bin/parrot`. Builds are unsigned for now, so the installer strips the quarantine xattr — once you've inspected the script you'll see exactly what it does.
-
-## How to use
-
-1. **Run it.** Either `parrot install --launch-at-login` (daemonized, runs forever, lives in the menu bar), or `parrot` in any terminal tab.
-2. **Click into the text field you want to dictate into** — Messages, the address bar, a Slack thread, anywhere a cursor blinks.
-3. **Hold the `fn` key, speak, release.** A small pill appears at the bottom of the screen while the mic is hot.
-4. **The transcript types itself in at the cursor** when you release. Usually within 200-300ms.
-
-That's it. There is no record button, no stop button, no "send" — `fn` is the whole interface.
-
-> **Note:** on most modern Macs the `fn` key is the bottom-left key. If yours is set to "Change input source" or "Show emoji & symbols," `parrot setup` will tell you how to flip it back to plain `fn`.
-
-## CLI
-
-```sh
-parrot                                 # run in the foreground (^C to quit)
-parrot setup                           # one-time setup: permissions + model download
-parrot install --launch-at-login       # register a LaunchAgent (background daemon)
-parrot install --uninstall             # remove the LaunchAgent
-parrot doctor                          # check permissions + fn key setting
-parrot models list                     # list available models
-parrot models download <id>            # pre-download a model
-parrot --model whisper-large-v3-turbo  # bigger, multilingual, slower first-run
-parrot --hotkey right-option           # change the push-to-talk key
-parrot --no-overlay                    # disable the bottom-of-screen pill
-```
-
-## Stack
-
-- **Swift** — single SPM executable target
-- **WhisperKit** — Whisper inference via CoreML, ANE-accelerated
-- **AVAudioEngine** — mic capture
-- **CGEventTap** — global hotkey
-- **CGEvent** — text injection at cursor
-- **NSWindow** (borderless, click-through) — recording-indicator pill
-
-See [docs/architecture.md](docs/architecture.md) for design notes.
-
-## Build from source
+## Build and run
 
 ```sh
 swift build -c release
-.build/release/parrot --help
+.build/release/regardingwork-dictate --help
+.build/release/regardingwork-dictate setup
+.build/release/regardingwork-dictate
 ```
+
+For a local unsigned app bundle:
+
+```sh
+VERSION=0.1.0-dev ./scripts/build-app.sh
+open "dist/RegardingWork Dictate.app"
+```
+
+Unsigned development bundles are for testing only. Do not strip quarantine or
+bypass Gatekeeper. Distribution requires Developer ID signing, notarization,
+stapling, and the verification gates in [SECURITY.md](SECURITY.md).
+
+## Install a signed release
+
+Download and inspect `scripts/install.sh`; do not pipe a remote script into a
+shell. The installer downloads a versioned app archive and its checksum,
+verifies SHA-256, the bundle identifier, code signature, and Gatekeeper
+acceptance, then installs the app.
+
+```sh
+./scripts/install.sh 0.1.0
+regardingwork-dictate setup
+regardingwork-dictate install --launch-at-login
+```
+
+No release is published by this repository's preparation workflow. The command
+above becomes usable only after an explicitly approved, signed release exists.
+
+## CLI
+
+```text
+regardingwork-dictate
+regardingwork-dictate setup
+regardingwork-dictate doctor
+regardingwork-dictate models list
+regardingwork-dictate models download whisper-base.en
+regardingwork-dictate run --model whisper-large-v3-turbo
+regardingwork-dictate run --no-overlay
+regardingwork-dictate run --dump-wav
+regardingwork-dictate install --launch-at-login
+regardingwork-dictate install --uninstall
+```
+
+`--dump-wav` is strictly opt-in. It writes one private temporary debugging file
+at `.../com.regardingwork.dictate/last-capture.wav`. Transcript text is never
+written to stdout, stderr, or LaunchAgent logs.
+
+Configuration defaults to:
+
+```text
+~/Library/Application Support/RegardingWork Dictate/config.json
+```
+
+Example:
+
+```json
+{
+  "version": 1,
+  "model": "whisper-base.en",
+  "overlay": true,
+  "debug_hotkey": false,
+  "dump_wav": false
+}
+```
+
+Command-line flags take precedence over matching configuration values.
+
+## Verification
+
+```sh
+swift build -c release
+swift test
+.build/release/regardingwork-dictate --help
+VERSION=0.1.0-dev ./scripts/build-app.sh
+```
+
+Manual microphone, hotkey, Accessibility, overlay, and text-injection checks
+are documented in [PILOT.md](PILOT.md).
+
+## Origin and license
+
+This repository preserves the complete history of the MIT-licensed
+[Digimata Parrot project](https://github.com/digimata/parrot). The original
+license and copyright remain unchanged in [LICENSE](LICENSE). See
+[UPSTREAM.md](UPSTREAM.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+for attribution and dependency notices.
