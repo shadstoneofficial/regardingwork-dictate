@@ -4,10 +4,10 @@ import Foundation
 import WhisperKit
 
 @main
-struct Parrot: ParsableCommand {
+struct RegardingWorkDictate: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "parrot",
-        abstract: "Minimal macOS dictation daemon. Hold Fn, speak, release.",
+        commandName: AppIdentity.executableName,
+        abstract: "Private, on-device macOS push-to-talk dictation from RegardingWork Voice.",
         subcommands: [Run.self, Setup.self, Doctor.self, Models.self, Install.self],
         defaultSubcommand: Run.self
     )
@@ -22,10 +22,10 @@ struct Run: ParsableCommand {
     @Flag(name: .long, help: "Skip permission checks at startup.")
     var skipDoctor: Bool = false
 
-    @Flag(name: .long, help: "Print every keyboard event the tap sees (debug).")
+    @Flag(name: .long, help: "Print modifier-state changes for hotkey debugging.")
     var debugHotkey: Bool = false
 
-    @Flag(name: .long, help: "Write each capture to /tmp/parrot-last.wav for inspection.")
+    @Flag(name: .long, help: "Write the latest capture to a private temporary WAV file.")
     var dumpWav: Bool = false
 
     @Flag(name: .long, help: "Disable the on-screen recording overlay.")
@@ -34,7 +34,24 @@ struct Run: ParsableCommand {
     @Option(name: .long, help: "Model id to use. Defaults to the recommended model.")
     var model: String?
 
+    @Option(name: .long, help: "Configuration JSON path. Defaults to Application Support.")
+    var config: String?
+
     func run() throws {
+        let configURL = config.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+            ?? AppIdentity.Paths.current.configuration
+        let storedConfig: AppConfig
+        do {
+            storedConfig = try AppConfig.load(from: configURL)
+        } catch {
+            FileHandle.standardError.write(Data("configuration error at \(configURL.path): \(error)\n".utf8))
+            throw ExitCode(78)
+        }
+        let selectedModelID = model ?? storedConfig.model
+        let debugHotkeyEnabled = debugHotkey || storedConfig.debugHotkey
+        let dumpWAVEnabled = dumpWav || storedConfig.dumpWAV
+        let overlayEnabled = !noOverlay && storedConfig.overlay
+
         if !skipDoctor {
             let checks = DoctorReport.run()
             if !DoctorReport.allOK(checks) {
@@ -45,20 +62,16 @@ struct Run: ParsableCommand {
             }
         }
 
-        let chosenModel: TranscriptionModel
-        if let id = model {
-            guard let m = ModelRegistry.find(id) else {
-                FileHandle.standardError.write(Data("unknown model: \(id)\n".utf8))
-                FileHandle.standardError.write(Data("run `parrot models list` to see options.\n".utf8))
-                throw ExitCode(1)
-            }
-            chosenModel = m
-        } else {
-            guard let m = ModelRegistry.recommended() else {
+        guard let chosenModel = ModelRegistry.select(id: selectedModelID) else {
+            if let selectedModelID {
+                FileHandle.standardError.write(Data("unknown model: \(selectedModelID)\n".utf8))
+                FileHandle.standardError.write(Data(
+                    "run `\(AppIdentity.executableName) models list` to see options.\n".utf8
+                ))
+            } else {
                 FileHandle.standardError.write(Data("no models registered\n".utf8))
-                throw ExitCode(1)
             }
-            chosenModel = m
+            throw ExitCode(1)
         }
 
         let transcriber = WhisperKitTranscriber(model: chosenModel)
@@ -81,10 +94,11 @@ struct Run: ParsableCommand {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let monitor = HotkeyMonitor(debug: debugHotkey)
+        let monitor = HotkeyMonitor(debug: debugHotkeyEnabled)
         let capture = AudioCapture()
-        let dumpWav = self.dumpWav
-        let overlay: RecordingOverlay? = noOverlay ? nil : MainActor.assumeIsolated { RecordingOverlay() }
+        let overlay: RecordingOverlay? = overlayEnabled
+            ? MainActor.assumeIsolated { RecordingOverlay() }
+            : nil
         if let overlay {
             capture.onLevel = { level in overlay.pushLevel(level) }
         }
@@ -115,11 +129,15 @@ struct Run: ParsableCommand {
                     FileHandle.standardError.write(Data(
                         String(format: "○ captured %.2fs · rms %.3f\n", seconds, rms).utf8
                     ))
-                    if dumpWav, !samples.isEmpty {
-                        let path = "/tmp/parrot-last.wav"
+                    if dumpWAVEnabled, !samples.isEmpty {
+                        let url = AppIdentity.Paths.current.debugWAV
                         do {
-                            try WAVWriter.write(samples: samples, sampleRate: 16_000, to: path)
-                            FileHandle.standardError.write(Data("  wrote \(path)\n".utf8))
+                            try SecureFiles.createPrivateDirectory(url.deletingLastPathComponent())
+                            try WAVWriter.write(samples: samples, sampleRate: 16_000, to: url.path)
+                            try SecureFiles.restrictFile(url)
+                            FileHandle.standardError.write(
+                                Data("  wrote private debug audio: \(url.path)\n".utf8)
+                            )
                         } catch {
                             FileHandle.standardError.write(Data("  wav write failed: \(error)\n".utf8))
                         }
@@ -137,7 +155,7 @@ struct Run: ParsableCommand {
                             let text = try await transcriber.transcribe(samples)
                             let elapsed = Date().timeIntervalSince(started)
                             FileHandle.standardError.write(Data(
-                                String(format: "→ %.2fs · %@\n", elapsed, text).utf8
+                                String(format: "→ %.2fs · %d characters\n", elapsed, text.count).utf8
                             ))
                             await MainActor.run {
                                 TextInjector.inject(text)
@@ -156,7 +174,9 @@ struct Run: ParsableCommand {
             }
         } catch {
             FileHandle.standardError.write(Data("failed to register hotkey tap: \(error)\n".utf8))
-            FileHandle.standardError.write(Data("run `parrot setup` to configure permissions.\n".utf8))
+            FileHandle.standardError.write(Data(
+                "run `\(AppIdentity.executableName) setup` to configure permissions.\n".utf8
+            ))
             throw ExitCode(1)
         }
 
