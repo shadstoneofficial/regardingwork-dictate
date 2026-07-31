@@ -3,7 +3,7 @@
 All notable RegardingWork Dictate changes are documented here. The project
 follows semantic versioning.
 
-## Unreleased
+## 0.1.2 - 2026-07-31
 
 ### Added
 
@@ -11,6 +11,8 @@ follows semantic versioning.
   packaged macOS app bundles.
 - Reproducible icon-generation script for the committed 1024-pixel source
   artwork and multi-resolution `.icns` asset.
+- Signed DMG packaging path for user-friendly manual installation, alongside
+  the existing installer-compatible ZIP archive.
 
 ## 0.1.1 - 2026-07-30
 

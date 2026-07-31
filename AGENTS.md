@@ -17,7 +17,7 @@ Verify every functional change:
 swift build -c release
 swift test
 .build/release/regardingwork-dictate --help
-VERSION=0.1.1-dev ./scripts/build-app.sh
+VERSION=0.1.2-dev ./scripts/build-app.sh
 rg -n -i 'parrot|digimata|com\.digimata\.parrot' \
   Sources Tests Packaging scripts .github README.md docs AGENTS.md
 git status --short

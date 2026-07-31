@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-0.1.1-dev}"
+VERSION="${VERSION:-0.1.2-dev}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 ARCH="${ARCH:-arm64}"
 DIST="${DIST:-${ROOT}/dist}"
