@@ -35,7 +35,7 @@ git fetch origin
 git switch master
 git pull --ff-only
 swift test
-VERSION=0.1.1 BUILD_NUMBER=1 ./scripts/build-app.sh
+VERSION=0.1.2 BUILD_NUMBER=2 ./scripts/build-app.sh
 ./scripts/sign-and-notarize.sh \
   "dist/RegardingWork Dictate.app" \
   "Developer ID Application: ORGANIZATION (TEAMID)" \
@@ -49,7 +49,7 @@ After the script reports success, package the stapled app and regenerate the
 checksum:
 
 ```sh
-VERSION=0.1.1
+VERSION=0.1.2
 ASSET="dist/regardingwork-dictate-v${VERSION}-macos-arm64.zip"
 ditto -c -k --norsrc --keepParent "dist/RegardingWork Dictate.app" "$ASSET"
 (cd dist && shasum -a 256 "$(basename "$ASSET")" > "$(basename "$ASSET").sha256")
@@ -59,6 +59,18 @@ spctl --assess --type execute --verbose=2 "dist/RegardingWork Dictate.app"
 (cd dist && shasum -a 256 -c "$(basename "$ASSET").sha256")
 ```
 
-Expected assets are
-`regardingwork-dictate-v0.1.1-macos-arm64.zip` and its `.sha256`. Do not tag or
-publish them until explicit release approval is given.
+Build the manual installer DMG from the stapled app:
+
+```sh
+VERSION=0.1.2 \
+SIGNING_IDENTITY="Developer ID Application: ORGANIZATION (TEAMID)" \
+./scripts/package-dmg.sh
+```
+
+Submit the finalized DMG for notarization, staple it, verify Gatekeeper, and
+generate checksums only after the ticket is stapled. Expected assets are
+`regardingwork-dictate-v0.1.2-macos-arm64.dmg`,
+`regardingwork-dictate-v0.1.2-macos-arm64.dmg.sha256`,
+`regardingwork-dictate-v0.1.2-macos-arm64.zip`, and
+`regardingwork-dictate-v0.1.2-macos-arm64.zip.sha256`. Do not tag or publish
+them until explicit release approval is given.
