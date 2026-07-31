@@ -1,9 +1,13 @@
 # Changelog
 
 All notable RegardingWork Dictate changes are documented here. The project
-follows semantic versioning once releases begin.
+follows semantic versioning.
 
 ## Unreleased
+
+No user-facing changes yet.
+
+## 0.1.1 - 2026-07-30
 
 ### Added
 
@@ -19,6 +23,11 @@ follows semantic versioning once releases begin.
 - The Fn/Globe system action is advisory at runtime instead of terminating the
   application.
 - Reopening the app brings setup or current diagnostics forward.
+
+### Fixed
+
+- Finder launches no longer appear to do nothing while permissions or the
+  on-device model are being prepared.
 
 ## 0.1.0 - 2026-07-30
 

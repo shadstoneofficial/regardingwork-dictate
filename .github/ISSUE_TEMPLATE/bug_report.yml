@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible, non-sensitive RegardingWork Dictate problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include recordings, transcripts, credentials, signing material,
+        exploit details, or personal data. Report security issues through a
+        private security advisory instead.
+  - type: input
+    id: version
+    attributes:
+      label: RegardingWork Dictate version
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac chip
+      placeholder: "macOS 15.5, Apple M2"
+    validations:
+      required: true
+  - type: input
+    id: target_app
+    attributes:
+      label: Application being dictated into
+      placeholder: "TextEdit"
+    validations:
+      required: false
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened?
+      description: Use invented text and sanitized reproduction details.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed recordings, transcripts, credentials, and personal data.
+          required: true
