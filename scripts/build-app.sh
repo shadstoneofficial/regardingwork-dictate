@@ -25,6 +25,7 @@ swift build --package-path "$ROOT" -c release --arch "$ARCH"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 install -m 0755 "$BINARY" "$APP/Contents/MacOS/regardingwork-dictate"
+install -m 0644 "$ROOT/Packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 sed \
     -e "s/__VERSION__/${VERSION}/g" \
     -e "s/__BUILD_NUMBER__/${BUILD_NUMBER}/g" \
@@ -33,6 +34,8 @@ chmod 0644 "$APP/Contents/Info.plist"
 
 plutil -lint "$APP/Contents/Info.plist"
 test "$(defaults read "$APP/Contents/Info" CFBundleIdentifier)" = "com.regardingwork.dictate"
+test "$(defaults read "$APP/Contents/Info" CFBundleIconFile)" = "AppIcon.icns"
+test -s "$APP/Contents/Resources/AppIcon.icns"
 file "$APP/Contents/MacOS/regardingwork-dictate"
 
 echo "built unsigned app: $APP"

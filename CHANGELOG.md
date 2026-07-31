@@ -5,7 +5,12 @@ follows semantic versioning.
 
 ## Unreleased
 
-No user-facing changes yet.
+### Added
+
+- Custom RegardingWork Dictate application icon for Finder, Applications, and
+  packaged macOS app bundles.
+- Reproducible icon-generation script for the committed 1024-pixel source
+  artwork and multi-resolution `.icns` asset.
 
 ## 0.1.1 - 2026-07-30
 
