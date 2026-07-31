@@ -2,10 +2,11 @@
 
 ## Reporting
 
-This is a private repository. Report vulnerabilities to the repository
-maintainers through a private GitHub security advisory or the organization's
-approved internal security channel. Do not open a public issue containing
-recordings, transcripts, credentials, signing material, or personal data.
+Report vulnerabilities through a
+[private GitHub security advisory](https://github.com/shadstoneofficial/regardingwork-dictate/security/advisories/new).
+Do not open a public issue containing recordings, transcripts, credentials,
+signing material, exploit details, or personal data. Ordinary usage questions
+and non-sensitive bug reports belong in GitHub Issues.
 
 ## Security posture
 
@@ -29,9 +30,9 @@ The preparation workflow builds an unsigned review artifact and does not
 publish a release. On the trusted Apple signing machine:
 
 ```sh
-cd /Users/janicejung/Documents/GitHub/regardingwork-dictate
+cd /path/to/regardingwork-dictate
 git fetch origin
-git switch agent/regardingwork-dictate-rebrand
+git switch master
 git pull --ff-only
 swift test
 VERSION=0.1.1 BUILD_NUMBER=1 ./scripts/build-app.sh

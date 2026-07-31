@@ -49,19 +49,25 @@ Unsigned development bundles are for testing only. Do not strip quarantine or
 bypass Gatekeeper. Distribution requires Developer ID signing, notarization,
 stapling, and the verification gates in [SECURITY.md](SECURITY.md).
 
-## Install a signed release
+## Install the signed release
 
-Download and inspect `scripts/install.sh`; do not pipe a remote script into a
+The current supported pilot release is
+[v0.1.1](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.1).
+Release v0.1.0 is retained for history but is superseded because it could launch
+without showing visible setup or recovery state.
+
+Download and inspect `scripts/install.sh`; never pipe a remote script into a
 shell. The installer downloads a versioned app archive and its checksum,
 verifies SHA-256, the bundle identifier, code signature, and Gatekeeper
-acceptance, then installs the app.
+acceptance, then installs the app:
 
 ```sh
 ./scripts/install.sh 0.1.1
 ```
 
-No release is published by this repository's preparation workflow. The command
-above becomes usable only after an explicitly approved, signed release exists.
+Only install assets attached to an approved GitHub release. The repository's
+GitHub Actions workflow produces an unsigned signing-handoff artifact; it
+cannot publish a release or access production Apple credentials.
 
 ## CLI
 
@@ -122,3 +128,12 @@ This repository preserves the complete history of the MIT-licensed
 license and copyright remain unchanged in [LICENSE](LICENSE). See
 [UPSTREAM.md](UPSTREAM.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 for attribution and dependency notices.
+
+## Community
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
+- Use [SUPPORT.md](SUPPORT.md) for help and bug-report guidance.
+- Report vulnerabilities privately as described in
+  [SECURITY.md](SECURITY.md).
+- See [TRADEMARKS.md](TRADEMARKS.md) before using RegardingWork names or
+  branding in a redistributed build.
