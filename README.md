@@ -45,6 +45,13 @@ VERSION=0.1.1-dev ./scripts/build-app.sh
 open "dist/RegardingWork Dictate.app"
 ```
 
+The Finder and application icon is generated from `Assets/AppIcon.png`. To
+regenerate the bundled macOS icon after changing the source artwork:
+
+```sh
+./scripts/generate-app-icon.sh
+```
+
 Unsigned development bundles are for testing only. Do not strip quarantine or
 bypass Gatekeeper. Distribution requires Developer ID signing, notarization,
 stapling, and the verification gates in [SECURITY.md](SECURITY.md).
