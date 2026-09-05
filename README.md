@@ -27,7 +27,9 @@ model. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 The waveform icon in the menu bar confirms the app is running. Its
 **Setup & Diagnostics…** menu item reopens setup or displays any startup error.
-Normal use does not require Terminal.
+Select **Start RegardingWork Dictate at Login** in the same menu to make the
+app available automatically after signing in or restarting. A checkmark shows
+that auto-start is enabled. Normal use does not require Terminal.
 
 ## Build and run
 
@@ -98,7 +100,7 @@ regardingwork-dictate install --uninstall
 
 `--dump-wav` is strictly opt-in. It writes one private temporary debugging file
 at `.../com.regardingwork.dictate/last-capture.wav`. Transcript text is never
-written to stdout, stderr, or LaunchAgent logs.
+written to stdout, stderr, or application logs.
 
 The CLI remains available for development and diagnostics. Configuration
 defaults to:

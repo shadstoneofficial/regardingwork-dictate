@@ -3,6 +3,15 @@
 All notable RegardingWork Dictate changes are documented here. The project
 follows semantic versioning.
 
+## Unreleased
+
+### Added
+
+- Visible **Start RegardingWork Dictate at Login** checkbox in the waveform
+  menu, backed by macOS's native login-item service.
+- Automatic migration away from the app's obsolete per-user LaunchAgent file
+  when the native login item is enabled or disabled.
+
 ## 0.1.2 - 2026-07-31
 
 ### Added

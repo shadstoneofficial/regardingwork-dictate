@@ -35,21 +35,27 @@ each pilot Mac:
    visible explanation, **Open System Settings**, and **Check Again** actions.
 4. Confirm the waveform menu item appears during preparation and offers
    **Setup & Diagnostics…**.
-5. Confirm model preparation has a visible activity indicator and a local-data
+5. Select **Start RegardingWork Dictate at Login**, confirm its checkmark
+   appears, and verify RegardingWork Dictate is enabled in System Settings →
+   General → Login Items & Extensions.
+6. Confirm model preparation has a visible activity indicator and a local-data
    explanation.
-6. Quit and double-click again; confirm it reaches ready state without Terminal.
-7. Hold and release `fn`; verify the recording overlay transitions to
+7. Quit and double-click again; confirm it reaches ready state without Terminal.
+8. Hold and release `fn`; verify the recording overlay transitions to
    transcribing and returns to idle.
-8. Dictate into TextEdit, Safari, Messages, Slack, a terminal, and one Electron
+9. Dictate into TextEdit, Safari, Messages, Slack, a terminal, and one Electron
    app. Confirm text appears only at the active cursor.
-9. Confirm no transcript text appears in
+10. Confirm no transcript text appears in
    `~/Library/Logs/RegardingWork Dictate/`.
-10. Confirm ordinary keystrokes are not logged with modifier debugging enabled.
-11. Opt into `--dump-wav`, inspect permissions with `stat`, then delete the
+11. Confirm ordinary keystrokes are not logged with modifier debugging enabled.
+12. Opt into `--dump-wav`, inspect permissions with `stat`, then delete the
    recording and disable the option.
-12. Log out and back in; confirm the LaunchAgent starts and existing permission
-   grants remain valid.
-13. Upgrade the signed app in place and repeat the permission check.
+13. Log out and back in; confirm the native login item starts the app and
+   existing permission grants remain valid.
+14. Clear **Start RegardingWork Dictate at Login**, log out and back in, and
+   confirm the app does not start automatically.
+15. Upgrade the signed app in place and repeat the permission and login-item
+   checks.
 
 Secure password fields may reject injected text; record that as a platform
 constraint, not a reason to broaden Accessibility event capture.
@@ -74,11 +80,13 @@ downloaded models, and logs erased.
 
 ## Rollback
 
-Uninstall the LaunchAgent, restore the previously approved signed app bundle to
-the same `/Applications` path, verify its checksum/signature/Gatekeeper status,
-and reinstall launch-at-login. Never roll back by moving tags or installing an
-unsigned artifact.
+Disable **Start RegardingWork Dictate at Login**, restore the previously
+approved signed app bundle to the same `/Applications` path, verify its
+checksum/signature/Gatekeeper status, and re-enable the setting. Never roll
+back by moving tags or installing an unsigned artifact.
 
 Users migrating from the original upstream app should stop its LaunchAgent
-before installing this app. Legacy upstream data and logs are not imported
+before installing this app. RegardingWork Dictate automatically removes its own
+obsolete LaunchAgent file after enabling the native login item; it does not
+alter the upstream app's files. Legacy upstream data and logs are not imported
 automatically; review and remove them manually only with the user's approval.
