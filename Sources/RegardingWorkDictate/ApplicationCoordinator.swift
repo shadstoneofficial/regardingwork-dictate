@@ -23,6 +23,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private let options: RuntimeOptions
     private let menuBar = MenuBarController()
     private let setupWindow = SetupWindowController()
+    private let launchAtLogin = LaunchAtLoginManager()
     private var startupState: StartupState = .checking
     private var preparationTask: Task<Void, Never>?
     private var signalSource: DispatchSourceSignal?
@@ -44,6 +45,17 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         menuBar.onShowSetup = { [weak self] in
             self?.renderStartupState(autoDismissReady: false)
         }
+        menuBar.onToggleLaunchAtLogin = { [weak self] in
+            self?.toggleLaunchAtLogin()
+        }
+        do {
+            try launchAtLogin.migrateLegacyIfNeeded()
+        } catch {
+            FileHandle.standardError.write(Data(
+                "launch-at-login migration failed: \(error.localizedDescription)\n".utf8
+            ))
+        }
+        refreshLaunchAtLoginStatus()
         installSignalHandler()
         transition(to: .checking)
         beginPreparation()
@@ -321,6 +333,38 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             string: "x-apple.systempreferences:com.apple.preference.security?\(pane)"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func toggleLaunchAtLogin() {
+        let currentStatus = launchAtLogin.status
+        if currentStatus == .requiresApproval {
+            launchAtLogin.openSystemSettings()
+            return
+        }
+
+        do {
+            try launchAtLogin.setEnabled(currentStatus != .enabled)
+            refreshLaunchAtLoginStatus()
+        } catch {
+            refreshLaunchAtLoginStatus()
+            showLaunchAtLoginError(error)
+        }
+    }
+
+    private func refreshLaunchAtLoginStatus() {
+        menuBar.setLaunchAtLoginStatus(launchAtLogin.status)
+    }
+
+    private func showLaunchAtLoginError(_ error: Error) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn’t Change Start at Login"
+        alert.informativeText = error.localizedDescription
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Open Login Items")
+        if alert.runModal() == .alertSecondButtonReturn {
+            launchAtLogin.openSystemSettings()
+        }
     }
 
     private func installSignalHandler() {

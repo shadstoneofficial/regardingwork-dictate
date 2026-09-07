@@ -8,8 +8,10 @@ final class MenuBarController {
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let setupItem: NSMenuItem
+    private let launchAtLoginItem: NSMenuItem
 
     var onShowSetup: (() -> Void)?
+    var onToggleLaunchAtLogin: (() -> Void)?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -34,6 +36,15 @@ final class MenuBarController {
         )
         menu.addItem(setupItem)
 
+        launchAtLoginItem = NSMenuItem(
+            title: "Start RegardingWork Dictate at Login",
+            action: #selector(toggleLaunchAtLoginClicked),
+            keyEquivalent: ""
+        )
+        menu.addItem(launchAtLoginItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(
             title: "Quit \(AppIdentity.productName)",
             action: #selector(quitClicked),
@@ -42,6 +53,7 @@ final class MenuBarController {
         menu.addItem(quitItem)
 
         setupItem.target = self
+        launchAtLoginItem.target = self
         quitItem.target = self
         statusItem.menu = menu
 
@@ -82,6 +94,21 @@ final class MenuBarController {
         setState("transcribing…")
     }
 
+    func setLaunchAtLoginStatus(_ status: LaunchAtLoginStatus) {
+        launchAtLoginItem.state = status.isSelected ? .on : .off
+        switch status {
+        case .requiresApproval:
+            launchAtLoginItem.title = "Start RegardingWork Dictate at Login (Approval Required…)"
+            launchAtLoginItem.isEnabled = true
+        case .unavailable:
+            launchAtLoginItem.title = "Start RegardingWork Dictate at Login (Unavailable)"
+            launchAtLoginItem.isEnabled = false
+        case .disabled, .enabled:
+            launchAtLoginItem.title = "Start RegardingWork Dictate at Login"
+            launchAtLoginItem.isEnabled = true
+        }
+    }
+
     private func setState(_ title: String) {
         stateLabel.title = title
         statusItem.button?.toolTip = "\(AppIdentity.productName): \(title)"
@@ -89,6 +116,10 @@ final class MenuBarController {
 
     @objc private func showSetupClicked() {
         onShowSetup?()
+    }
+
+    @objc private func toggleLaunchAtLoginClicked() {
+        onToggleLaunchAtLogin?()
     }
 
     @objc private func quitClicked() {

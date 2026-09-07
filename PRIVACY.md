@@ -35,8 +35,8 @@ events and does not record keycodes.
 - Debug audio: the macOS temporary directory under
   `com.regardingwork.dictate/`
 
-Private directories are created with mode `0700`; logs, LaunchAgent plists, and
-debug recordings are restricted to mode `0600`.
+Private directories are created with mode `0700`; logs, legacy LaunchAgent
+plists, and debug recordings are restricted to mode `0600`.
 
 ## Reporting
 
