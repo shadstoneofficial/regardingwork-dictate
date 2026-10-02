@@ -54,8 +54,18 @@ each pilot Mac:
    existing permission grants remain valid.
 14. Clear **Start RegardingWork Dictate at Login**, log out and back in, and
    confirm the app does not start automatically.
-15. Upgrade the signed app in place and repeat the permission and login-item
-   checks.
+15. Choose **Dictation Language → Thai**. Confirm the multilingual model is
+    prepared locally, the menu reports Thai, and the selection survives an app
+    restart.
+16. Dictate several Thai-only phrases into TextEdit and Safari. Confirm Thai
+    script is inserted at the cursor and no transcript appears in application
+    logs.
+17. Test Thai names, numbers, punctuation, and short mixed Thai-English phrases.
+    Record accuracy limitations without transmitting recordings or transcripts.
+18. Switch back to English and confirm the smaller English model becomes ready
+    without restarting the app.
+19. Upgrade the signed app in place and repeat the permission, language, and
+    login-item checks.
 
 Secure password fields may reject injected text; record that as a platform
 constraint, not a reason to broaden Accessibility event capture.

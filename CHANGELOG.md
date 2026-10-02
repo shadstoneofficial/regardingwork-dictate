@@ -11,6 +11,9 @@ follows semantic versioning.
   menu, backed by macOS's native login-item service.
 - Automatic migration away from the app's obsolete per-user LaunchAgent file
   when the native login item is enabled or disabled.
+- Persistent **English / Thai** dictation selector in the waveform menu.
+- Explicit Thai decoding through the on-device multilingual Whisper model,
+  including secure configuration persistence and Thai Unicode tests.
 
 ## 0.1.2 - 2026-07-31
 

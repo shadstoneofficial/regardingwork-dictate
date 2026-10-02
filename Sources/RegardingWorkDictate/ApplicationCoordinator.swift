@@ -15,6 +15,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
 
     private struct ResolvedSettings {
         let model: TranscriptionModel
+        let language: TranscriptionLanguage
         let debugHotkey: Bool
         let dumpWAV: Bool
         let overlay: Bool
@@ -33,6 +34,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private var overlay: RecordingOverlay?
     private var transcriber: WhisperKitTranscriber?
     private var activeModelID: String?
+    private var activeLanguage: TranscriptionLanguage?
     private var dumpWAVEnabled = false
 
     init(options: RuntimeOptions) {
@@ -44,6 +46,9 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         NSApp.delegate = self
         menuBar.onShowSetup = { [weak self] in
             self?.renderStartupState(autoDismissReady: false)
+        }
+        menuBar.onSelectLanguage = { [weak self] language in
+            self?.selectLanguage(language)
         }
         menuBar.onToggleLaunchAtLogin = { [weak self] in
             self?.toggleLaunchAtLogin()
@@ -98,10 +103,13 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
 
             transition(to: .preparing(
                 modelID: settings.model.id,
-                displayName: settings.model.displayName
+                displayName: "\(settings.model.displayName) for \(settings.language.displayName)"
             ))
 
-            let transcriber = WhisperKitTranscriber(model: settings.model)
+            let transcriber = WhisperKitTranscriber(
+                model: settings.model,
+                language: settings.language
+            )
             try await transcriber.warmUp()
             try startRuntime(transcriber: transcriber, settings: settings)
 
@@ -112,27 +120,43 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     private func resolveSettings() throws -> ResolvedSettings {
-        let configURL = options.configurationPath.map {
-            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
-        } ?? AppIdentity.Paths.current.configuration
-
         let storedConfig: AppConfig
         do {
-            storedConfig = try AppConfig.load(from: configURL)
+            storedConfig = try AppConfig.load(from: configurationURL)
         } catch {
-            throw StartupError.configuration(path: configURL.path, underlying: error)
+            throw StartupError.configuration(path: configurationURL.path, underlying: error)
         }
 
         let selectedModelID = options.modelID ?? storedConfig.model
-        guard let model = ModelRegistry.select(id: selectedModelID) else {
-            if let selectedModelID {
+        let model: TranscriptionModel
+        if let selectedModelID {
+            guard let selectedModel = ModelRegistry.find(selectedModelID) else {
                 throw StartupError.unknownModel(selectedModelID)
             }
-            throw StartupError.noModels
+            if selectedModel.supports(storedConfig.language) {
+                model = selectedModel
+            } else if options.modelID != nil {
+                throw StartupError.unsupportedLanguage(
+                    model: selectedModelID,
+                    language: storedConfig.language.displayName
+                )
+            } else if let fallback = ModelRegistry.recommended(for: storedConfig.language) {
+                model = fallback
+            } else {
+                throw StartupError.noModelForLanguage(storedConfig.language.displayName)
+            }
+        } else {
+            guard let defaultModel = ModelRegistry.recommended(for: storedConfig.language) else {
+                throw StartupError.noModelForLanguage(storedConfig.language.displayName)
+            }
+            model = defaultModel
         }
+
+        menuBar.setLanguage(storedConfig.language)
 
         return ResolvedSettings(
             model: model,
+            language: storedConfig.language,
             debugHotkey: options.debugHotkey || storedConfig.debugHotkey,
             dumpWAV: options.dumpWAV || storedConfig.dumpWAV,
             overlay: !options.noOverlay && storedConfig.overlay
@@ -184,6 +208,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         self.overlay = overlay
         self.transcriber = transcriber
         activeModelID = settings.model.id
+        activeLanguage = settings.language
         dumpWAVEnabled = settings.dumpWAV
     }
 
@@ -265,6 +290,47 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var configurationURL: URL {
+        options.configurationPath.map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath)
+        } ?? AppIdentity.Paths.current.configuration
+    }
+
+    private func selectLanguage(_ language: TranscriptionLanguage) {
+        guard language != activeLanguage else { return }
+
+        do {
+            var config = try AppConfig.load(from: configurationURL)
+            config.language = language
+            try config.save(to: configurationURL)
+
+            menuBar.setLanguage(language)
+            monitor?.stop()
+            monitor = nil
+            capture = nil
+            overlay?.hide()
+            overlay = nil
+            transcriber = nil
+            activeModelID = nil
+            activeLanguage = nil
+            beginPreparation()
+        } catch {
+            if let activeLanguage {
+                menuBar.setLanguage(activeLanguage)
+            }
+            showLanguageError(error)
+        }
+    }
+
+    private func showLanguageError(_ error: Error) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Couldn’t Change Dictation Language"
+        alert.informativeText = error.localizedDescription
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
     private func showRuntimeFailure(_ message: String) {
         overlay?.hide()
         transition(to: .failed(message))
@@ -276,14 +342,19 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         switch state {
         case .checking:
             menuBar.setChecking()
+            menuBar.setLanguageSelectionEnabled(false)
         case .permissions:
             menuBar.setNeedsAttention("permissions")
+            menuBar.setLanguageSelectionEnabled(true)
         case .preparing(let modelID, _):
             menuBar.setPreparing(modelID: modelID)
+            menuBar.setLanguageSelectionEnabled(false)
         case .ready(let modelID):
             menuBar.setReady(modelID: modelID)
+            menuBar.setLanguageSelectionEnabled(true)
         case .failed:
             menuBar.setNeedsAttention("setup")
+            menuBar.setLanguageSelectionEnabled(true)
         }
 
         renderStartupState(autoDismissReady: true)
@@ -391,6 +462,8 @@ private enum StartupError: LocalizedError {
     case configuration(path: String, underlying: Error)
     case unknownModel(String)
     case noModels
+    case noModelForLanguage(String)
+    case unsupportedLanguage(model: String, language: String)
 
     var errorDescription: String? {
         switch self {
@@ -400,6 +473,10 @@ private enum StartupError: LocalizedError {
             return "The configured model “\(id)” is not available. Update or remove that model setting, then try again."
         case .noModels:
             return "No on-device transcription models are registered."
+        case .noModelForLanguage(let language):
+            return "No on-device transcription model is available for \(language)."
+        case .unsupportedLanguage(let model, let language):
+            return "The model “\(model)” does not support \(language). Choose a multilingual model or remove the model override."
         }
     }
 }

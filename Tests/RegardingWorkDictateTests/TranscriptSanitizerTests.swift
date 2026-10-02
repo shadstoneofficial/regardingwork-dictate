@@ -2,6 +2,13 @@ import XCTest
 @testable import RegardingWorkDictate
 
 final class TranscriptSanitizerTests: XCTestCase {
+    func testPreservesThaiUnicodeText() {
+        XCTAssertEqual(
+            TranscriptSanitizer.sanitize("  สวัสดีครับ   วันนี้เป็นอย่างไรบ้าง  "),
+            "สวัสดีครับ วันนี้เป็นอย่างไรบ้าง"
+        )
+    }
+
     func testRemovesKnownNonSpeechAndControlTokens() {
         let input = " Hello [BLANK_AUDIO] (music playing) <|nospeech|> *background noise* world. "
         XCTAssertEqual(TranscriptSanitizer.sanitize(input), "Hello world.")
