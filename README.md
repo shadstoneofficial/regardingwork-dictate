@@ -54,7 +54,7 @@ swift build -c release
 For a local unsigned app bundle:
 
 ```sh
-VERSION=0.1.2-dev ./scripts/build-app.sh
+VERSION=0.1.4-dev ./scripts/build-app.sh
 open "dist/RegardingWork Dictate.app"
 ```
 
@@ -72,8 +72,8 @@ stapling, and the verification gates in [SECURITY.md](SECURITY.md).
 ## Install the signed release
 
 The current supported pilot release is
-[v0.1.2](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.2).
-Release v0.1.1 remains available for rollback. Release v0.1.0 is retained for
+[v0.1.4](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.4).
+Release v0.1.3 remains available for rollback. Release v0.1.0 is retained for
 history but is superseded because it could launch without showing visible setup
 or recovery state.
 
@@ -87,7 +87,7 @@ verifies SHA-256, the bundle identifier, code signature, and Gatekeeper
 acceptance, then installs the app:
 
 ```sh
-./scripts/install.sh 0.1.2
+./scripts/install.sh 0.1.4
 ```
 
 Only install assets attached to an approved GitHub release. The repository's
@@ -141,7 +141,7 @@ Command-line flags take precedence over matching configuration values.
 swift build -c release
 swift test
 .build/release/regardingwork-dictate --help
-VERSION=0.1.2-dev ./scripts/build-app.sh
+VERSION=0.1.4-dev ./scripts/build-app.sh
 ```
 
 Manual microphone, hotkey, Accessibility, overlay, and text-injection checks
