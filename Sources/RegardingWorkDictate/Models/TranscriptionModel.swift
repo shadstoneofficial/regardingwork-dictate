@@ -14,6 +14,10 @@ struct TranscriptionModel: Codable {
     let sizeMB: Int
     let languages: [String]
     let recommended: Bool
+
+    func supports(_ language: TranscriptionLanguage) -> Bool {
+        languages.contains(language.rawValue) || languages.contains("multi")
+    }
 }
 
 struct ModelsManifest: Codable {

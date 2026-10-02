@@ -44,10 +44,31 @@ enum ModelRegistry {
         shared.first { $0.recommended } ?? shared.first
     }
 
+    static func recommended(
+        for language: TranscriptionLanguage,
+        from models: [TranscriptionModel] = shared
+    ) -> TranscriptionModel? {
+        models.first { $0.recommended && $0.supports(language) }
+            ?? models.first { $0.supports(language) }
+    }
+
     static func select(id: String?, from models: [TranscriptionModel] = shared) -> TranscriptionModel? {
         if let id {
             return models.first { $0.id == id }
         }
         return models.first { $0.recommended } ?? models.first
+    }
+
+    static func select(
+        id: String?,
+        language: TranscriptionLanguage,
+        from models: [TranscriptionModel] = shared
+    ) -> TranscriptionModel? {
+        if let id,
+           let selected = models.first(where: { $0.id == id }),
+           selected.supports(language) {
+            return selected
+        }
+        return recommended(for: language, from: models)
     }
 }

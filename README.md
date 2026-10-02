@@ -31,6 +31,17 @@ Select **Start RegardingWork Dictate at Login** in the same menu to make the
 app available automatically after signing in or restarting. A checkmark shows
 that auto-start is enabled. Normal use does not require Terminal.
 
+### English and Thai dictation
+
+Open the waveform menu and choose **Dictation Language → English** or
+**Dictation Language → Thai**. The choice is saved for future launches.
+
+English uses the smaller English model by default. Thai automatically uses the
+multilingual Whisper Large v3 Turbo model and transcribes Thai speech as Thai
+text. The first switch to Thai downloads approximately 1.6 GB of on-device
+model data, so preparation can take a few minutes. Audio and transcripts still
+remain on the Mac; only the model is downloaded.
+
 ## Build and run
 
 ```sh
@@ -115,6 +126,7 @@ Example:
 {
   "version": 1,
   "model": "whisper-base.en",
+  "language": "en",
   "overlay": true,
   "debug_hotkey": false,
   "dump_wav": false

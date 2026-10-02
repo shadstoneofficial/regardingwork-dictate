@@ -8,9 +8,14 @@ final class MenuBarController {
     private let modelLabel: NSMenuItem
     private let stateLabel: NSMenuItem
     private let setupItem: NSMenuItem
+    private let languageItem: NSMenuItem
+    private let englishLanguageItem: NSMenuItem
+    private let thaiLanguageItem: NSMenuItem
     private let launchAtLoginItem: NSMenuItem
+    private var currentLanguage = TranscriptionLanguage.english
 
     var onShowSetup: (() -> Void)?
+    var onSelectLanguage: ((TranscriptionLanguage) -> Void)?
     var onToggleLaunchAtLogin: (() -> Void)?
 
     init() {
@@ -36,6 +41,27 @@ final class MenuBarController {
         )
         menu.addItem(setupItem)
 
+        languageItem = NSMenuItem(
+            title: "Dictation Language: English",
+            action: nil,
+            keyEquivalent: ""
+        )
+        englishLanguageItem = NSMenuItem(
+            title: "English",
+            action: #selector(selectEnglishClicked),
+            keyEquivalent: ""
+        )
+        thaiLanguageItem = NSMenuItem(
+            title: "Thai",
+            action: #selector(selectThaiClicked),
+            keyEquivalent: ""
+        )
+        let languageMenu = NSMenu(title: "Dictation Language")
+        languageMenu.addItem(englishLanguageItem)
+        languageMenu.addItem(thaiLanguageItem)
+        languageItem.submenu = languageMenu
+        menu.addItem(languageItem)
+
         launchAtLoginItem = NSMenuItem(
             title: "Start RegardingWork Dictate at Login",
             action: #selector(toggleLaunchAtLoginClicked),
@@ -53,9 +79,12 @@ final class MenuBarController {
         menu.addItem(quitItem)
 
         setupItem.target = self
+        englishLanguageItem.target = self
+        thaiLanguageItem.target = self
         launchAtLoginItem.target = self
         quitItem.target = self
         statusItem.menu = menu
+        setLanguage(.english)
 
         if let button = statusItem.button {
             let image = NSImage(
@@ -79,7 +108,7 @@ final class MenuBarController {
 
     func setReady(modelID: String) {
         modelLabel.title = "model: \(modelID)"
-        setState("ready · hold fn to dictate")
+        setState(readyStateTitle)
     }
 
     func setNeedsAttention(_ message: String) {
@@ -87,11 +116,22 @@ final class MenuBarController {
     }
 
     func setRecording(_ recording: Bool) {
-        setState(recording ? "● recording" : "ready · hold fn to dictate")
+        setState(recording ? "● recording · \(currentLanguage.displayName)" : readyStateTitle)
     }
 
     func setTranscribing() {
-        setState("transcribing…")
+        setState("transcribing \(currentLanguage.displayName)…")
+    }
+
+    func setLanguage(_ language: TranscriptionLanguage) {
+        currentLanguage = language
+        languageItem.title = "Dictation Language: \(language.displayName)"
+        englishLanguageItem.state = language == .english ? .on : .off
+        thaiLanguageItem.state = language == .thai ? .on : .off
+    }
+
+    func setLanguageSelectionEnabled(_ enabled: Bool) {
+        languageItem.isEnabled = enabled
     }
 
     func setLaunchAtLoginStatus(_ status: LaunchAtLoginStatus) {
@@ -114,8 +154,20 @@ final class MenuBarController {
         statusItem.button?.toolTip = "\(AppIdentity.productName): \(title)"
     }
 
+    private var readyStateTitle: String {
+        "ready · \(currentLanguage.displayName) · hold fn to dictate"
+    }
+
     @objc private func showSetupClicked() {
         onShowSetup?()
+    }
+
+    @objc private func selectEnglishClicked() {
+        onSelectLanguage?(.english)
+    }
+
+    @objc private func selectThaiClicked() {
+        onSelectLanguage?(.thai)
     }
 
     @objc private func toggleLaunchAtLoginClicked() {

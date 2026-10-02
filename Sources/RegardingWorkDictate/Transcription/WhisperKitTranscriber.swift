@@ -4,11 +4,13 @@ import WhisperKit
 actor WhisperKitTranscriber: Transcriber {
     let modelID: String
     private let model: TranscriptionModel
+    private let language: TranscriptionLanguage
     private var pipeline: WhisperKit?
 
-    init(model: TranscriptionModel) {
+    init(model: TranscriptionModel, language: TranscriptionLanguage = .english) {
         self.modelID = model.id
         self.model = model
+        self.language = language
     }
 
     /// Loads the model into memory; downloads first if not already on disk.
@@ -37,9 +39,22 @@ actor WhisperKitTranscriber: Transcriber {
         if pipeline == nil { try await warmUp() }
         guard let pipeline else { throw TranscriberError.notLoaded }
 
-        let results = try await pipeline.transcribe(audioArray: audio)
+        let decodeOptions = Self.decodingOptions(for: language)
+        let results = try await pipeline.transcribe(
+            audioArray: audio,
+            decodeOptions: decodeOptions
+        )
         let raw = results.map(\.text).joined(separator: " ")
         return TranscriptSanitizer.sanitize(raw)
+    }
+
+    static func decodingOptions(for language: TranscriptionLanguage) -> DecodingOptions {
+        DecodingOptions(
+            task: .transcribe,
+            language: language.rawValue,
+            usePrefillPrompt: true,
+            detectLanguage: false
+        )
     }
 }
 
