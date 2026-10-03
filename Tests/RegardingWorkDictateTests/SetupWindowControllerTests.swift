@@ -4,6 +4,48 @@ import XCTest
 
 @MainActor
 final class SetupWindowControllerTests: XCTestCase {
+    func testReadyWindowOffersPracticeWithoutRequiringTerminal() {
+        _ = NSApplication.shared
+        let controller = SetupWindowController()
+        var practiced = false
+        controller.showReady(autoDismiss: false, done: {}, practice: { practiced = true })
+        let button = buttons(in: controller.window?.contentView).first { $0.title == "Try Dictation" }
+        XCTAssertEqual(button?.isHidden, false)
+        button?.performClick(nil)
+        XCTAssertTrue(practiced)
+        controller.closeAndReturnToMenuBar()
+    }
+
+    func testPracticeClearsItsTextWhenClosed() {
+        _ = NSApplication.shared
+        let controller = PracticeWindowController()
+        controller.present(language: .thai)
+        controller.textView.string = "ข้อความทดสอบ"
+        XCTAssertTrue(controller.textView.isEditable)
+        XCTAssertFalse(controller.textView.allowsUndo)
+        controller.close()
+        XCTAssertEqual(controller.textView.string, "")
+    }
+
+    func testRecoveryRequiresExplicitCopyAndClearsItsTextOnClose() {
+        _ = NSApplication.shared
+        let controller = RecoveryWindowController()
+        var copied = false
+        var dismissed = false
+        controller.onCopy = { copied = true }
+        controller.onDismiss = { dismissed = true }
+        controller.present(text: "Temporary example", reason: "Focus changed")
+        let textView = descendants(in: controller.window?.contentView).compactMap { $0 as? NSTextView }.first
+        XCTAssertEqual(textView?.string, "Temporary example")
+        XCTAssertEqual(textView?.isEditable, false)
+        XCTAssertFalse(copied)
+        buttons(in: controller.window?.contentView).first { $0.title == "Copy Text" }?.performClick(nil)
+        XCTAssertTrue(copied)
+        controller.clear()
+        XCTAssertEqual(textView?.string, "")
+        XCTAssertTrue(dismissed)
+    }
+
     func testStartupFailureIsVisibleAndRecoverable() {
         _ = NSApplication.shared
         let controller = SetupWindowController()

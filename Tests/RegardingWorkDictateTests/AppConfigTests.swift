@@ -7,6 +7,7 @@ final class AppConfigTests: XCTestCase {
         XCTAssertEqual(try AppConfig.load(from: url), .default)
         XCTAssertFalse(AppConfig.default.debugHotkey)
         XCTAssertFalse(AppConfig.default.dumpWAV)
+        XCTAssertFalse(AppConfig.default.feedbackSounds)
         XCTAssertTrue(AppConfig.default.overlay)
         XCTAssertEqual(AppConfig.default.language, .english)
     }
@@ -37,6 +38,16 @@ final class AppConfigTests: XCTestCase {
         let data = Data(#"{"version":1}"#.utf8)
         let config = try JSONDecoder().decode(AppConfig.self, from: data)
         XCTAssertEqual(config.language, .english)
+        XCTAssertFalse(config.feedbackSounds)
+    }
+
+    func testFeedbackSoundsAreOptInAndRoundTripWithoutBreakingExistingConfig() throws {
+        var config = AppConfig.default
+        config.feedbackSounds = true
+        let data = try JSONEncoder().encode(config)
+        XCTAssertEqual(try JSONDecoder().decode(AppConfig.self, from: data), config)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["feedback_sounds"] as? Bool, true)
     }
 
     func testSavesLanguageWithPrivatePermissions() throws {

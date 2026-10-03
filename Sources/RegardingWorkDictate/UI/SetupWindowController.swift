@@ -87,14 +87,16 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
         present()
     }
 
-    func showReady(autoDismiss: Bool, done: @escaping () -> Void) {
+    func showReady(autoDismiss: Bool, done: @escaping () -> Void, practice: (() -> Void)? = nil) {
         configure(
             title: "RegardingWork Dictate is ready",
             message: "Click into any text field, hold fn while you speak, then release it.",
             detail: "The waveform icon in the menu bar shows that the app is running.",
             showsProgress: false,
             primaryTitle: "Start Dictating",
-            primaryAction: done
+            primaryAction: done,
+            secondaryTitle: practice == nil ? nil : "Try Dictation",
+            secondaryAction: practice
         )
         present()
 

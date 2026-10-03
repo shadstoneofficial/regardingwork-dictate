@@ -9,39 +9,40 @@ final class RecordingOverlay {
         case hidden
         case recording
         case transcribing
+        case notice(String)
     }
 
     private var window: NSPanel?
     private let model = OverlayModel()
+    private var pendingHide: DispatchWorkItem?
 
-    func show(_ state: State) {
+    func show(_ state: State, language: TranscriptionLanguage = .english) {
+        pendingHide?.cancel()
+        pendingHide = nil
         ensureWindow()
+        model.language = language.displayName
         if state == .recording {
             model.resetLevels()
         }
         guard let window else { return }
-        let needsAppear = !window.isVisible
-        if needsAppear {
+        if !window.isVisible {
             positionAtBottomCenter(window)
             window.orderFrontRegardless()
-            // Defer the state change so SwiftUI lays out in the .hidden style
-            // first, then animates to the visible style on the next runloop tick.
-            DispatchQueue.main.async { [model] in
-                model.state = state
-            }
-        } else {
-            model.state = state
         }
+        model.state = state
     }
 
     func hide() {
+        pendingHide?.cancel()
         model.state = .hidden
         // Let the SwiftUI scale+fade animation play out before yanking the
         // window — otherwise it just pops away.
         let window = self.window
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+        let dismissal = DispatchWorkItem {
             window?.orderOut(nil)
         }
+        pendingHide = dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: dismissal)
     }
 
     /// Push a new audio level (0…~1). Safe to call from any thread.
@@ -54,7 +55,7 @@ final class RecordingOverlay {
     private func ensureWindow() {
         if window != nil { return }
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 96, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 60),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -94,6 +95,7 @@ final class OverlayModel: ObservableObject {
     private static let envelope: [Float] = [0.55, 0.85, 1.0, 1.0, 0.85, 0.55]
 
     @Published var state: RecordingOverlay.State = .hidden
+    @Published var language = "English"
     @Published var levels: [Float] = Array(repeating: 0, count: barCount)
 
     func pushLevel(_ level: Float) {
@@ -135,13 +137,25 @@ private struct OverlayPill: View {
     private var content: some View {
         switch model.state {
         case .hidden, .recording:
-            Waveform(levels: model.levels)
-                .frame(width: 54, height: 22)
+            HStack(spacing: 12) {
+                Waveform(levels: model.levels).frame(width: 44, height: 22)
+                Text("Listening — \(model.language)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
         case .transcribing:
-            ProgressView()
-                .controlSize(.small)
-                .scaleEffect(0.8)
-                .frame(width: 54, height: 22)
+            HStack(spacing: 12) {
+                ProgressView().controlSize(.small).colorScheme(.dark)
+                Text("Processing — \(model.language)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        case .notice(let message):
+            Text(message)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .frame(width: 280)
         }
     }
 }
