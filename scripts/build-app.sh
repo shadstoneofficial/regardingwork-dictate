@@ -26,6 +26,10 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 install -m 0755 "$BINARY" "$APP/Contents/MacOS/regardingwork-dictate"
 install -m 0644 "$ROOT/Packaging/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+mkdir -p "$APP/Contents/Resources/Licenses"
+install -m 0644 "$ROOT/LICENSE" "$APP/Contents/Resources/Licenses/Original-MIT.txt"
+install -m 0644 "$ROOT/docs/licenses/PARROT_UPSTREAM_MIT.txt" "$APP/Contents/Resources/Licenses/Upstream-MIT.txt"
+install -m 0644 "$ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/ThirdPartyNotices.md"
 sed \
     -e "s/__VERSION__/${VERSION}/g" \
     -e "s/__BUILD_NUMBER__/${BUILD_NUMBER}/g" \

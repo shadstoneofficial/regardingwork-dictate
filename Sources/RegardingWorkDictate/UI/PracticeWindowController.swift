@@ -5,6 +5,7 @@ import AppKit
 final class PracticeWindowController: NSWindowController, NSWindowDelegate {
     let textView = NSTextView()
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
+    private let instructions = NSTextField(wrappingLabelWithString: "")
 
     init() {
         let window = NSWindow(
@@ -19,9 +20,7 @@ final class PracticeWindowController: NSWindowController, NSWindowDelegate {
 
         let heading = NSTextField(labelWithString: "Try your first dictation")
         heading.font = .systemFont(ofSize: 22, weight: .semibold)
-        let instructions = NSTextField(wrappingLabelWithString:
-            "Hold fn, say a short sentence, then release. Your words will appear below. Close this window to clear the practice text."
-        )
+        setHotkey(.fn)
         instructions.font = .systemFont(ofSize: 14)
         textView.font = .systemFont(ofSize: 18)
         textView.isRichText = false
@@ -60,7 +59,8 @@ final class PracticeWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) { nil }
 
-    func present(language: TranscriptionLanguage) {
+    func present(language: TranscriptionLanguage, hotkey: HotkeyKey = .fn) {
+        setHotkey(hotkey)
         statusLabel.stringValue = "Ready — \(language.displayName). Practice text stays in this window."
         NSApp.setActivationPolicy(.regular)
         window?.center()
@@ -71,6 +71,10 @@ final class PracticeWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func setStatus(_ text: String) { statusLabel.stringValue = text }
+
+    func setHotkey(_ key: HotkeyKey) {
+        instructions.stringValue = "Hold \(key.shortName), say a short sentence, then release. Your words will appear below. Close this window to clear the practice text."
+    }
 
     var isInputFocused: Bool {
         window?.isVisible == true && window?.isKeyWindow == true &&

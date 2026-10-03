@@ -14,6 +14,9 @@ final class MenuBarController {
     private let launchAtLoginItem: NSMenuItem
     private let practiceItem: NSMenuItem
     private let soundsItem: NSMenuItem
+    private let hotkeyItem: NSMenuItem
+    private var hotkeyItems: [HotkeyKey: NSMenuItem] = [:]
+    private var currentHotkey = HotkeyKey.fn
     private var currentLanguage = TranscriptionLanguage.english
 
     var onShowSetup: (() -> Void)?
@@ -21,6 +24,7 @@ final class MenuBarController {
     var onToggleLaunchAtLogin: (() -> Void)?
     var onPractice: (() -> Void)?
     var onToggleSounds: (() -> Void)?
+    var onSelectHotkey: ((HotkeyKey) -> Void)?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -50,6 +54,11 @@ final class MenuBarController {
         menu.addItem(practiceItem)
         soundsItem = NSMenuItem(title: "Recording Feedback Sounds", action: #selector(soundsClicked), keyEquivalent: "")
         menu.addItem(soundsItem)
+
+        hotkeyItem = NSMenuItem(title: "Push-to-Talk Key: fn / Globe", action: nil, keyEquivalent: "")
+        let hotkeyMenu = NSMenu(title: "Push-to-Talk Key")
+        hotkeyItem.submenu = hotkeyMenu
+        menu.addItem(hotkeyItem)
 
         languageItem = NSMenuItem(
             title: "Dictation Language: English",
@@ -95,8 +104,16 @@ final class MenuBarController {
         thaiLanguageItem.target = self
         launchAtLoginItem.target = self
         quitItem.target = self
+        for key in HotkeyKey.allCases {
+            let item = NSMenuItem(title: key.displayName, action: #selector(hotkeyClicked(_:)), keyEquivalent: "")
+            item.representedObject = key.rawValue
+            item.target = self
+            hotkeyMenu.addItem(item)
+            hotkeyItems[key] = item
+        }
         statusItem.menu = menu
         setLanguage(.english)
+        setHotkey(.fn)
 
         if let button = statusItem.button {
             let image = NSImage(
@@ -141,6 +158,14 @@ final class MenuBarController {
 
     func setSoundsEnabled(_ enabled: Bool) { soundsItem.state = enabled ? .on : .off }
 
+    func setHotkey(_ key: HotkeyKey) {
+        currentHotkey = key
+        hotkeyItem.title = "Push-to-Talk Key: \(key.displayName)"
+        for (choice, item) in hotkeyItems { item.state = choice == key ? .on : .off }
+    }
+
+    func setHotkeySelectionEnabled(_ enabled: Bool) { hotkeyItem.isEnabled = enabled }
+
     func setLanguage(_ language: TranscriptionLanguage) {
         currentLanguage = language
         languageItem.title = "Dictation Language: \(language.displayName)"
@@ -174,7 +199,7 @@ final class MenuBarController {
     }
 
     private var readyStateTitle: String {
-        "ready · \(currentLanguage.displayName) · hold fn to dictate"
+        "ready · \(currentLanguage.displayName) · hold \(currentHotkey.shortName) to dictate"
     }
 
     @objc private func showSetupClicked() {
@@ -184,6 +209,11 @@ final class MenuBarController {
     @objc private func practiceClicked() { onPractice?() }
 
     @objc private func soundsClicked() { onToggleSounds?() }
+
+    @objc private func hotkeyClicked(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String, let key = HotkeyKey(rawValue: name) else { return }
+        onSelectHotkey?(key)
+    }
 
     @objc private func selectEnglishClicked() {
         onSelectLanguage?(.english)

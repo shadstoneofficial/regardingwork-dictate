@@ -7,4 +7,5 @@ struct RuntimeOptions {
     let noOverlay: Bool
     let modelID: String?
     let configurationPath: String?
+    var hotkey: HotkeyKey? = nil
 }

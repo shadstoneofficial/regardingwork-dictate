@@ -7,6 +7,7 @@ struct AppConfig: Codable, Equatable {
     var debugHotkey: Bool
     var dumpWAV: Bool
     var feedbackSounds: Bool
+    var hotkey: HotkeyKey
 
     static let `default` = AppConfig(
         model: nil,
@@ -29,6 +30,7 @@ struct AppConfig: Codable, Equatable {
         case debugHotkey = "debug_hotkey"
         case dumpWAV = "dump_wav"
         case feedbackSounds = "feedback_sounds"
+        case hotkey
     }
 
     init(
@@ -37,7 +39,8 @@ struct AppConfig: Codable, Equatable {
         overlay: Bool,
         debugHotkey: Bool,
         dumpWAV: Bool,
-        feedbackSounds: Bool = false
+        feedbackSounds: Bool = false,
+        hotkey: HotkeyKey = .fn
     ) {
         self.model = model
         self.language = language
@@ -45,6 +48,7 @@ struct AppConfig: Codable, Equatable {
         self.debugHotkey = debugHotkey
         self.dumpWAV = dumpWAV
         self.feedbackSounds = feedbackSounds
+        self.hotkey = hotkey
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +66,7 @@ struct AppConfig: Codable, Equatable {
         debugHotkey = try container.decodeIfPresent(Bool.self, forKey: .debugHotkey) ?? false
         dumpWAV = try container.decodeIfPresent(Bool.self, forKey: .dumpWAV) ?? false
         feedbackSounds = try container.decodeIfPresent(Bool.self, forKey: .feedbackSounds) ?? false
+        hotkey = try container.decodeIfPresent(HotkeyKey.self, forKey: .hotkey) ?? .fn
     }
 
     func encode(to encoder: Encoder) throws {
@@ -73,6 +78,7 @@ struct AppConfig: Codable, Equatable {
         try container.encode(debugHotkey, forKey: .debugHotkey)
         try container.encode(dumpWAV, forKey: .dumpWAV)
         try container.encode(feedbackSounds, forKey: .feedbackSounds)
+        try container.encode(hotkey, forKey: .hotkey)
     }
 
     static func load(from url: URL, fileManager: FileManager = .default) throws -> AppConfig {
