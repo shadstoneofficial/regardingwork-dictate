@@ -70,6 +70,12 @@ this small fix.
 - Upstream draft: [cursor/selection safety PR #61](https://github.com/humanitas-labs/parrot/pull/61),
   contributed via `shadstoneofficial/parrot-upstream-contributions`, not our
   product repository.
+- Product draft: [configurable-key PR #7](https://github.com/shadstoneofficial/regardingwork-dictate/pull/7),
+  based on confidence PR #6. Review/merge #6 first, then retarget #7 to `master`.
+- GitHub checks: no product CI checks are reported. Upstream's Vercel preview
+  check reports **Authorization required to deploy**; its maintainer must
+  authorize that external preview. This is not an application build/test result,
+  and no deployment authorization/settings were changed by this work.
 
 Physical microphone/key operation, cross-application Accessibility, real Thai
 speech, disconnect/reconnect, sleep/wake and closed-lid testing remain manual
