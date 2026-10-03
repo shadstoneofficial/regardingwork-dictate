@@ -67,6 +67,40 @@ each pilot Mac:
 19. Upgrade the signed app in place and repeat the permission, language, and
     login-item checks.
 
+### Next-release confidence checks
+
+Use non-sensitive example speech. Do not upload recordings or transcripts.
+
+1. Open **Try Dictation** from setup and **Try Dictation…** from the waveform
+   menu. Dictate English and Thai sentences into the practice box, confirm
+   Listening/Processing labels, and close/reopen it to confirm the text clears.
+2. Confirm the selected language is visible in the overlay. With no speech or
+   very low microphone signal, expect a try-again notice, not fabricated text.
+   A brief Fn tap should show a hold-longer notice.
+3. Enable **Recording Feedback Sounds**, listen for start/stop cues, restart,
+   and confirm the preference persists. Disable it and confirm cues stop.
+4. Press/release Fn again while the first sentence is processing. Confirm no
+   second capture starts, no duplicate text is sent, and later dictation works.
+5. Switch to another app, another field in the same app, or move/select text
+   while recognition is processing. Confirm nothing is sent to the changed
+   destination and the result appears in recovery instead.
+6. Try a password field, read-only field, and an app whose field cannot be
+   inspected through Accessibility. Confirm the app does not bypass those
+   restrictions and offers recovery for a recognized sentence.
+7. Copy recovery text explicitly and paste it into a chosen field. Confirm the
+   recovery window clears. Repeat, wait 60 seconds without copying, and confirm
+   expiry clears and closes it. Also check close, new recording, language
+   change, and quit clear a pending result.
+8. Close the practice window or change its selection during processing. Confirm
+   no result is inserted elsewhere. Test long Thai text and emoji in TextEdit,
+   Safari, Messages, Slack, and an Electron app for dropped/reordered characters.
+9. Repeat on multiple displays and in a full-screen app. Confirm the overlay
+   does not take keyboard focus or disappear during a new recording.
+
+macOS keyboard-event posting cannot confirm that a receiving app accepted the
+text. Successful results are not retained for retry; record app-specific
+compatibility limitations without adding transcript history.
+
 Secure password fields may reject injected text; record that as a platform
 constraint, not a reason to broaden Accessibility event capture.
 

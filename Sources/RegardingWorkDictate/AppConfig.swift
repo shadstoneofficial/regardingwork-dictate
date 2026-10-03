@@ -6,13 +6,15 @@ struct AppConfig: Codable, Equatable {
     var overlay: Bool
     var debugHotkey: Bool
     var dumpWAV: Bool
+    var feedbackSounds: Bool
 
     static let `default` = AppConfig(
         model: nil,
         language: .english,
         overlay: true,
         debugHotkey: false,
-        dumpWAV: false
+        dumpWAV: false,
+        feedbackSounds: false
     )
 
     enum ConfigError: Error, Equatable {
@@ -26,6 +28,7 @@ struct AppConfig: Codable, Equatable {
         case overlay
         case debugHotkey = "debug_hotkey"
         case dumpWAV = "dump_wav"
+        case feedbackSounds = "feedback_sounds"
     }
 
     init(
@@ -33,13 +36,15 @@ struct AppConfig: Codable, Equatable {
         language: TranscriptionLanguage = .english,
         overlay: Bool,
         debugHotkey: Bool,
-        dumpWAV: Bool
+        dumpWAV: Bool,
+        feedbackSounds: Bool = false
     ) {
         self.model = model
         self.language = language
         self.overlay = overlay
         self.debugHotkey = debugHotkey
         self.dumpWAV = dumpWAV
+        self.feedbackSounds = feedbackSounds
     }
 
     init(from decoder: Decoder) throws {
@@ -56,6 +61,7 @@ struct AppConfig: Codable, Equatable {
         overlay = try container.decodeIfPresent(Bool.self, forKey: .overlay) ?? true
         debugHotkey = try container.decodeIfPresent(Bool.self, forKey: .debugHotkey) ?? false
         dumpWAV = try container.decodeIfPresent(Bool.self, forKey: .dumpWAV) ?? false
+        feedbackSounds = try container.decodeIfPresent(Bool.self, forKey: .feedbackSounds) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -66,6 +72,7 @@ struct AppConfig: Codable, Equatable {
         try container.encode(overlay, forKey: .overlay)
         try container.encode(debugHotkey, forKey: .debugHotkey)
         try container.encode(dumpWAV, forKey: .dumpWAV)
+        try container.encode(feedbackSounds, forKey: .feedbackSounds)
     }
 
     static func load(from url: URL, fileManager: FileManager = .default) throws -> AppConfig {

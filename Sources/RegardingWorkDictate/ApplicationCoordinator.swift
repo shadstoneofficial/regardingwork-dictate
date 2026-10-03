@@ -19,12 +19,15 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         let debugHotkey: Bool
         let dumpWAV: Bool
         let overlay: Bool
+        let feedbackSounds: Bool
     }
 
     private let options: RuntimeOptions
     private let menuBar = MenuBarController()
     private let setupWindow = SetupWindowController()
     private let launchAtLogin = LaunchAtLoginManager()
+    private let practiceWindow = PracticeWindowController()
+    private let recoveryWindow = RecoveryWindowController()
     private var startupState: StartupState = .checking
     private var preparationTask: Task<Void, Never>?
     private var signalSource: DispatchSourceSignal?
@@ -36,6 +39,14 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private var activeModelID: String?
     private var activeLanguage: TranscriptionLanguage?
     private var dumpWAVEnabled = false
+    private var feedbackSoundsEnabled = false
+    private var session = DictationSession()
+    private var destination: TextDestination?
+    private var practiceSelection: NSRange?
+    private var transcriptionTask: Task<Void, Never>?
+    private var feedbackDismissal: Task<Void, Never>?
+    private var recoveryExpiry: Task<Void, Never>?
+    private var pendingDictation = PendingDictation()
 
     init(options: RuntimeOptions) {
         self.options = options
@@ -52,6 +63,13 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         }
         menuBar.onToggleLaunchAtLogin = { [weak self] in
             self?.toggleLaunchAtLogin()
+        }
+        menuBar.onPractice = { [weak self] in self?.showPractice() }
+        menuBar.onToggleSounds = { [weak self] in self?.toggleFeedbackSounds() }
+        recoveryWindow.onCopy = { [weak self] in self?.copyPendingDictation() }
+        recoveryWindow.onDismiss = { [weak self] in
+            self?.pendingDictation.clear()
+            self?.recoveryExpiry?.cancel()
         }
         do {
             try launchAtLogin.migrateLegacyIfNeeded()
@@ -75,7 +93,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     private func beginPreparation() {
-        guard preparationTask == nil else { return }
+        guard preparationTask == nil, session.isIdle else { return }
         preparationTask = Task { [weak self] in
             guard let self else { return }
             await self.prepare()
@@ -159,7 +177,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             language: storedConfig.language,
             debugHotkey: options.debugHotkey || storedConfig.debugHotkey,
             dumpWAV: options.dumpWAV || storedConfig.dumpWAV,
-            overlay: !options.noOverlay && storedConfig.overlay
+            overlay: !options.noOverlay && storedConfig.overlay,
+            feedbackSounds: storedConfig.feedbackSounds
         )
     }
 
@@ -187,6 +206,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         settings: ResolvedSettings
     ) throws {
         monitor?.stop()
+        transcriptionTask?.cancel()
+        session.cancel()
 
         let monitor = HotkeyMonitor(debug: settings.debugHotkey)
         let capture = AudioCapture()
@@ -210,26 +231,44 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         activeModelID = settings.model.id
         activeLanguage = settings.language
         dumpWAVEnabled = settings.dumpWAV
+        feedbackSoundsEnabled = settings.feedbackSounds
+        menuBar.setSoundsEnabled(settings.feedbackSounds)
     }
 
     private func handleHotkey(_ event: HotkeyMonitor.Event) {
-        guard let capture else { return }
+        guard case .ready = startupState, let capture, let language = activeLanguage else { return }
 
         switch event {
         case .pressed:
+            guard session.begin() != nil else {
+                // Keep the current processing indicator; ignore the matching release.
+                return
+            }
+            feedbackDismissal?.cancel()
+            destination = TextDestination.capture()
+            practiceSelection = practiceWindow.isInputFocused ? practiceWindow.textView.selectedRange() : nil
+            clearRecovery()
             do {
                 try capture.start()
                 FileHandle.standardError.write(Data("● recording\n".utf8))
-                overlay?.show(.recording)
+                overlay?.show(.recording, language: language)
                 menuBar.setRecording(true)
+                menuBar.setLanguageSelectionEnabled(false)
+                menuBar.setPracticeEnabled(false)
+                practiceWindow.setStatus("Listening — \(language.displayName)")
+                playFeedbackSound("Tink")
             } catch {
+                session.cancel()
                 showRuntimeFailure("Microphone capture failed: \(error.localizedDescription)")
             }
 
         case .released:
+            guard let sessionID = session.release() else { return }
             let samples = capture.stop()
-            overlay?.show(.transcribing)
+            playFeedbackSound("Pop")
+            overlay?.show(.transcribing, language: language)
             menuBar.setTranscribing()
+            practiceWindow.setStatus("Processing — \(language.displayName)")
 
             let seconds = Double(samples.count) / AudioCapture.targetSampleRate
             let rms = computeRMS(samples)
@@ -241,31 +280,129 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 writeDebugAudio(samples)
             }
 
-            guard !samples.isEmpty, let transcriber else {
-                returnToReadyState()
+            let assessment = CapturedAudioAssessment.assess(samples)
+            guard assessment == .usable else {
+                _ = session.complete(sessionID)
+                showNotice(assessment == .tooShort
+                    ? "Hold fn longer while you speak"
+                    : "Microphone too quiet — try again")
+                return
+            }
+            guard let transcriber else {
+                _ = session.complete(sessionID)
+                showRuntimeFailure("Dictation is not ready. Please try setup again.")
                 return
             }
 
-            Task { [weak self] in
+            transcriptionTask = Task { [weak self] in
                 let started = Date()
                 do {
                     let text = try await transcriber.transcribe(samples)
+                    guard !Task.isCancelled, let self, self.session.complete(sessionID) else { return }
                     let elapsed = Date().timeIntervalSince(started)
                     FileHandle.standardError.write(Data(
                         String(format: "→ %.2fs · %d characters\n", elapsed, text.count).utf8
                     ))
-                    await MainActor.run {
-                        TextInjector.inject(text)
-                        self?.returnToReadyState()
-                    }
+                    self.transcriptionTask = nil
+                    self.finishDictation(text)
                 } catch {
-                    await MainActor.run {
-                        self?.showRuntimeFailure(
-                            "Transcription failed: \(error.localizedDescription)"
-                        )
-                    }
+                    guard !Task.isCancelled, let self, self.session.complete(sessionID) else { return }
+                    self.transcriptionTask = nil
+                    self.showRuntimeFailure("Transcription failed. Choose Try Again to prepare dictation again.")
                 }
             }
+        }
+    }
+
+    private func finishDictation(_ text: String) {
+        guard !text.isEmpty else {
+            showNotice("No words recognized — try again")
+            return
+        }
+        let canInsert: Bool
+        if let practiceSelection {
+            canInsert = practiceWindow.isInputFocused &&
+                practiceWindow.textView.selectedRange() == practiceSelection
+        } else {
+            canInsert = destination?.isStillFocused == true
+        }
+        guard canInsert else {
+            offerRecovery(text, reason: "The original text field is no longer selected, or it does not allow text input. Copy your words and paste them where you want.")
+            return
+        }
+        guard TextInjector.inject(text) else {
+            offerRecovery(text, reason: "Text could not be sent to the selected field. Copy your words and paste them where you want.")
+            return
+        }
+        returnToReadyState()
+        practiceWindow.setStatus("Text sent — check your sentence below. Hold fn to try again.")
+    }
+
+    private func showNotice(_ message: String) {
+        returnToReadyState()
+        menuBar.setNeedsAttention(message)
+        practiceWindow.setStatus(message)
+        overlay?.show(.notice(message), language: activeLanguage ?? .english)
+        feedbackDismissal?.cancel()
+        feedbackDismissal = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled, let self, self.session.isIdle else { return }
+            self.returnToReadyState()
+        }
+    }
+
+    private func offerRecovery(_ text: String, reason: String) {
+        returnToReadyState()
+        practiceWindow.setStatus("Text was not inserted. Use the temporary recovery window to copy it.")
+        pendingDictation.store(text)
+        recoveryWindow.present(text: text, reason: reason)
+        recoveryExpiry?.cancel()
+        recoveryExpiry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(PendingDictation.lifetime * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.clearRecovery()
+        }
+    }
+
+    private func clearRecovery() {
+        pendingDictation.clear()
+        recoveryExpiry?.cancel()
+        recoveryExpiry = nil
+        recoveryWindow.clear()
+    }
+
+    private func copyPendingDictation() {
+        guard let text = pendingDictation.text() else {
+            clearRecovery()
+            return
+        }
+        NSPasteboard.general.clearContents()
+        if NSPasteboard.general.setString(text, forType: .string) { clearRecovery() }
+    }
+
+    private func showPractice() {
+        guard session.isIdle, case .ready = startupState, let language = activeLanguage else { return }
+        setupWindow.closeAndReturnToMenuBar()
+        practiceWindow.present(language: language)
+    }
+
+    private func playFeedbackSound(_ name: String) {
+        guard feedbackSoundsEnabled else { return }
+        NSSound(named: NSSound.Name(name))?.play()
+    }
+
+    private func toggleFeedbackSounds() {
+        do {
+            var config = try AppConfig.load(from: configurationURL)
+            config.feedbackSounds.toggle()
+            try config.save(to: configurationURL)
+            feedbackSoundsEnabled = config.feedbackSounds
+            menuBar.setSoundsEnabled(config.feedbackSounds)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn’t Save Recording Sounds"
+            alert.informativeText = "Please check that the configuration folder is writable and try again."
+            alert.runModal()
         }
     }
 
@@ -284,9 +421,13 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     private func returnToReadyState() {
+        destination = nil
+        practiceSelection = nil
         overlay?.hide()
         if let activeModelID {
             menuBar.setReady(modelID: activeModelID)
+            menuBar.setLanguageSelectionEnabled(true)
+            menuBar.setPracticeEnabled(true)
         }
     }
 
@@ -297,7 +438,9 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     private func selectLanguage(_ language: TranscriptionLanguage) {
-        guard language != activeLanguage else { return }
+        guard session.isIdle, language != activeLanguage else { return }
+        feedbackDismissal?.cancel()
+        clearRecovery()
 
         do {
             var config = try AppConfig.load(from: configurationURL)
@@ -338,6 +481,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
 
     private func transition(to state: StartupState) {
         startupState = state
+        menuBar.setPracticeEnabled(false)
 
         switch state {
         case .checking:
@@ -352,6 +496,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         case .ready(let modelID):
             menuBar.setReady(modelID: modelID)
             menuBar.setLanguageSelectionEnabled(true)
+            menuBar.setPracticeEnabled(true)
         case .failed:
             menuBar.setNeedsAttention("setup")
             menuBar.setLanguageSelectionEnabled(true)
@@ -384,6 +529,10 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 done: { [weak self] in
                     UserDefaults.standard.set(true, forKey: "hasCompletedFirstLaunch")
                     self?.setupWindow.closeAndReturnToMenuBar()
+                },
+                practice: { [weak self] in
+                    UserDefaults.standard.set(true, forKey: "hasCompletedFirstLaunch")
+                    self?.showPractice()
                 }
             )
 
@@ -447,6 +596,16 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         }
         source.resume()
         signalSource = source
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        monitor?.stop()
+        capture?.stop()
+        transcriptionTask?.cancel()
+        feedbackDismissal?.cancel()
+        clearRecovery()
+        session.cancel()
+        practiceWindow.textView.string = ""
     }
 
     private static func userFacingMessage(for error: Error) -> String {

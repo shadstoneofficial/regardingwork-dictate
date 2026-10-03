@@ -27,6 +27,9 @@ model. See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md).
 
 The waveform icon in the menu bar confirms the app is running. Its
 **Setup & Diagnostics…** menu item reopens setup or displays any startup error.
+**Try Dictation…** opens a practice text field. The recording overlay names the
+language and shows **Listening** or **Processing**. Optional **Recording Feedback
+Sounds** in the menu provides start/stop cues and is off by default.
 Select **Start RegardingWork Dictate at Login** in the same menu to make the
 app available automatically after signing in or restarting. A checkmark shows
 that auto-start is enabled. Normal use does not require Terminal.
@@ -41,6 +44,22 @@ multilingual Whisper Large v3 Turbo model and transcribes Thai speech as Thai
 text. The first switch to Thai downloads approximately 1.6 GB of on-device
 model data, so preparation can take a few minutes. Audio and transcripts still
 remain on the Mac; only the model is downloaded.
+
+### Safer text insertion (next release)
+
+Finish one sentence before starting another. Dictate checks that the original
+text field and cursor selection are still selected before sending text. If they
+changed, or the field cannot be verified as editable, a recovery window offers
+**Copy Text**. That blocked result exists only in memory and clears after 60
+seconds, when you close or copy it, or when you start a new dictation. Clipboard
+contents may be retained or synced by macOS or other apps. Successful results
+are not kept for recovery; apps that silently reject keyboard events still need
+manual compatibility testing.
+
+Practice text clears when its window closes. These improvements are in source
+for the next release; the published v0.1.4 installer does not include them yet.
+See [the improvement roadmap](docs/IMPROVEMENT_ROADMAP.md) for implemented scope,
+future work, and acceptance checks.
 
 ## Build and run
 
@@ -129,7 +148,8 @@ Example:
   "language": "en",
   "overlay": true,
   "debug_hotkey": false,
-  "dump_wav": false
+  "dump_wav": false,
+  "feedback_sounds": false
 }
 ```
 

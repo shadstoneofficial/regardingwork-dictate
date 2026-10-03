@@ -12,11 +12,15 @@ final class MenuBarController {
     private let englishLanguageItem: NSMenuItem
     private let thaiLanguageItem: NSMenuItem
     private let launchAtLoginItem: NSMenuItem
+    private let practiceItem: NSMenuItem
+    private let soundsItem: NSMenuItem
     private var currentLanguage = TranscriptionLanguage.english
 
     var onShowSetup: (() -> Void)?
     var onSelectLanguage: ((TranscriptionLanguage) -> Void)?
     var onToggleLaunchAtLogin: (() -> Void)?
+    var onPractice: (() -> Void)?
+    var onToggleSounds: (() -> Void)?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -40,6 +44,12 @@ final class MenuBarController {
             keyEquivalent: ","
         )
         menu.addItem(setupItem)
+
+        practiceItem = NSMenuItem(title: "Try Dictation…", action: #selector(practiceClicked), keyEquivalent: "")
+        practiceItem.isEnabled = false
+        menu.addItem(practiceItem)
+        soundsItem = NSMenuItem(title: "Recording Feedback Sounds", action: #selector(soundsClicked), keyEquivalent: "")
+        menu.addItem(soundsItem)
 
         languageItem = NSMenuItem(
             title: "Dictation Language: English",
@@ -79,6 +89,8 @@ final class MenuBarController {
         menu.addItem(quitItem)
 
         setupItem.target = self
+        practiceItem.target = self
+        soundsItem.target = self
         englishLanguageItem.target = self
         thaiLanguageItem.target = self
         launchAtLoginItem.target = self
@@ -116,12 +128,18 @@ final class MenuBarController {
     }
 
     func setRecording(_ recording: Bool) {
-        setState(recording ? "● recording · \(currentLanguage.displayName)" : readyStateTitle)
+        setState(recording ? "● Listening — \(currentLanguage.displayName)" : readyStateTitle)
+        statusItem.button?.contentTintColor = recording ? .systemRed : nil
     }
 
     func setTranscribing() {
-        setState("transcribing \(currentLanguage.displayName)…")
+        setState("Processing — \(currentLanguage.displayName)…")
+        statusItem.button?.contentTintColor = .systemOrange
     }
+
+    func setPracticeEnabled(_ enabled: Bool) { practiceItem.isEnabled = enabled }
+
+    func setSoundsEnabled(_ enabled: Bool) { soundsItem.state = enabled ? .on : .off }
 
     func setLanguage(_ language: TranscriptionLanguage) {
         currentLanguage = language
@@ -150,6 +168,7 @@ final class MenuBarController {
     }
 
     private func setState(_ title: String) {
+        statusItem.button?.contentTintColor = nil
         stateLabel.title = title
         statusItem.button?.toolTip = "\(AppIdentity.productName): \(title)"
     }
@@ -161,6 +180,10 @@ final class MenuBarController {
     @objc private func showSetupClicked() {
         onShowSetup?()
     }
+
+    @objc private func practiceClicked() { onPractice?() }
+
+    @objc private func soundsClicked() { onToggleSounds?() }
 
     @objc private func selectEnglishClicked() {
         onSelectLanguage?(.english)
