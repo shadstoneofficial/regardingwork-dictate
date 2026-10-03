@@ -4,9 +4,19 @@ RegardingWork Dictate is designed for private, local dictation.
 
 ## Data handling
 
-- Microphone audio is held in memory only while the push-to-talk key is held.
+- Microphone audio is captured while the push-to-talk key is held and processed
+  in memory after release.
 - Transcription runs locally through WhisperKit and Core ML.
-- The transcript is injected at the active cursor and is not retained.
+- Text is sent to the original focused text field only if its identity and
+  selection can still be verified. Target contents are not read; only
+  Accessibility identity, editability, and selection metadata are checked.
+- Successful results are not retained. If insertion is blocked, one temporary
+  result is displayed for explicit copying and held in memory for up to 60
+  seconds. Closing or copying it, starting another dictation, changing language,
+  or quitting clears it. It is never written to disk or logs.
+- Practice text remains in its window's memory while open and clears on close.
+- Choosing **Copy Text** replaces the system clipboard. macOS clipboard sync,
+  clipboard managers, and destination apps may retain that text independently.
 - Transcript text is never written to application or LaunchAgent logs.
 - No audio, transcript, usage event, diagnostic, or telemetry is transmitted.
 - There is no server, account, Railway service, analytics SDK, or cloud
@@ -37,6 +47,9 @@ events and does not record keycodes.
 
 Private directories are created with mode `0700`; logs, legacy LaunchAgent
 plists, and debug recordings are restricted to mode `0600`.
+
+The selected language and optional recording-sound preference are saved locally
+in configuration. Recording sounds are off by default.
 
 ## Reporting
 

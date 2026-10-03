@@ -5,7 +5,7 @@
 RegardingWork Dictate is a macOS menu-bar application and CLI. It captures
 microphone audio only while the push-to-talk modifier is held, transcribes the
 captured buffer locally with WhisperKit/Core ML, and injects the sanitized text
-at the active cursor.
+at the original focused field after verifying its identity and selection.
 
 It intentionally has no server, telemetry, transcript history, meeting
 recording, cloud transcription, or post-processing service.
@@ -13,8 +13,10 @@ recording, cloud transcription, or post-processing service.
 ## Runtime flow
 
 ```text
-fn down → AudioCapture → in-memory 16 kHz mono PCM → recording overlay
-fn up   → WhisperKitTranscriber → TranscriptSanitizer → TextInjector
+fn down → destination snapshot → AudioCapture → in-memory PCM → Listening overlay
+fn up   → signal assessment → WhisperKitTranscriber → TranscriptSanitizer
+              → original destination unchanged/editable → TextInjector
+              → destination blocked/changed → temporary recovery → explicit Copy
 ```
 
 `HotkeyMonitor` installs a listen-only Accessibility event tap for
@@ -22,6 +24,19 @@ fn up   → WhisperKitTranscriber → TranscriptSanitizer → TextInjector
 events. `AudioCapture` uses `AVAudioEngine`. `RecordingOverlay` and
 `MenuBarController` are AppKit/SwiftUI surfaces. `TextInjector` posts Unicode
 keyboard events with Core Graphics.
+
+`DictationSession` accepts one recording/transcription at a time and rejects
+stale completions. `TextDestination` reads Accessibility identity, editability,
+and selection metadata, never existing field contents. A blocked result uses
+`PendingDictation` and `RecoveryWindowController` for a maximum of 60 seconds in
+memory; it clears on copy, close, expiry, another recording, language change, or
+quit. Successful results are not cached. Keyboard-event posting cannot prove
+that another app accepted the text.
+
+`PracticeWindowController` provides a local editable field for the same runtime
+path; closing it clears practice text. Optional start/stop sounds use system
+sounds and are off by default. The overlay remains nonactivating and
+click-through so it does not take the destination's focus.
 
 The default model is selected from `ModelRegistry`. `AppConfig` can override
 the model and privacy-safe UI/debug defaults. Command-line options take
@@ -79,7 +94,9 @@ quarantine.
 ## Testing boundary
 
 Swift tests cover platform-independent behavior: transcript sanitization,
-configuration parsing/defaults, model selection, and branded paths. Release
+configuration parsing/defaults, model selection, branded paths, session guards,
+destination changes, audio signal checks, recovery expiry, and Unicode event
+chunking. AppKit tests also check practice/recovery actions and clearing. Release
 build, CLI help, bundle construction, plist validation, shell syntax, and stale
 identifier searches are automated separately.
 

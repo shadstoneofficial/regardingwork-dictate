@@ -3,6 +3,32 @@
 All notable RegardingWork Dictate changes are documented here. The project
 follows semantic versioning.
 
+## Unreleased
+
+### Added
+
+- Language-labelled Listening/Processing overlay and menu-bar feedback.
+- Optional recording start/stop sounds, off by default and saved locally.
+- Built-in practice text field from setup and the waveform menu.
+- Visible notices for very brief captures, very low audio signal, and empty
+  recognition results.
+- A 60-second, memory-only recovery window for text that cannot be safely sent
+  to its original field; copying is explicit.
+- Improvement roadmap covering the agreed next-release scope and later work.
+
+### Fixed
+
+- Overlapping Fn interactions cannot start multiple transcription sessions.
+- Changed applications, fields, or cursor selections block automatic insertion.
+- Cancelled or stale session completions cannot insert text.
+- Emoji surrogate pairs are kept together across keyboard-event chunks.
+
+### Privacy
+
+- Recovery and practice text never create disk history or transcript logs.
+- Recovery clears on expiry, close, copy, next recording, language change, or
+  quit. Clipboard retention after an explicit copy is outside the app's control.
+
 ## 0.1.4 - 2026-10-02
 
 ### Added
