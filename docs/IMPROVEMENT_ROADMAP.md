@@ -18,7 +18,8 @@ They are not yet in a published installer.
 - Menu-bar status and colour reflect listening and processing.
 - **Recording Feedback Sounds** offers start/stop cues. It is off by default
   and saved in configuration as `feedback_sounds`.
-- A very brief key tap produces a hold-longer message. Very low microphone
+- A very brief key tap produces a cancellation message with the configurable
+  key filter. Very low microphone
   signal produces a try-again message without invoking recognition.
 - An empty recognition result produces a visible notice rather than silently
   disappearing.
@@ -61,11 +62,12 @@ They are not yet in a published installer.
 
 ## Subsequent improvements
 
-These items are planned, not implemented in this change.
+The table separates further work under review from deferred work. None is in
+the published v0.1.4 installer.
 
 | Priority | Improvement | Intended outcome and acceptance |
 | --- | --- | --- |
-| 4 | Custom shortcuts and toggle recording | Choose a shortcut and hold-to-talk or press-to-toggle. Test external keyboards, conflicts with macOS shortcuts, and cancellation. Keep event monitoring narrowly scoped. |
+| 4 | Configurable modifier keys; toggle deferred | Modifier-only push-to-talk is implemented on `agent/upstream-hotkeys`, adapted from upstream and stacked on the confidence PR. Physical-key verification is pending. Toggle remains a separate design decision requiring a duration cap and missed-release recovery. |
 | 5 | Thai accuracy and local vocabulary | Collect Snook's non-sensitive examples of names, terminology, punctuation, and mixed Thai/English speech. Establish a baseline before testing optional local vocabulary hints. Ship only measured improvements. |
 | 6 | Model progress and microphone selection | Show real download progress and retries; select/test a microphone. Test interrupted downloads, offline restarts, Bluetooth disconnects, and device changes. |
 | 7 | In-app update checks | Let users deliberately check for updates and install a verified, signed release. Validate artifact integrity, bundle identity, signature, and Gatekeeper before replacing the app. |
@@ -107,3 +109,7 @@ or signing material belong in Git.
   using non-sensitive example text; previews did not access the microphone.
 - Real speech, permissions, physical Fn input, sound audibility, focus changes
   in external applications, and recognition quality: pending manual pilot tests.
+
+See [the upstream review](UPSTREAM_REVIEW_2026-10-03.md) before starting the
+remaining items: upstream already has dictionary and updater implementations,
+but they require a separate dependency/privacy/release review before adoption.

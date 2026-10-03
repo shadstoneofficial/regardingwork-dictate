@@ -7,6 +7,14 @@ follows semantic versioning.
 
 ### Added
 
+- Adapt selected upstream modifier-key/gesture improvements: configurable
+  left/right Option, Command, Control and Shift push-to-talk keys, short-tap and
+  modifier-chord cancellation, saved menu preferences, selected-key instructions
+  and an initial CLI override. Fn remains the default.
+- Document the upstream transfer, selective integration/contribution process,
+  deferred capabilities and manual acceptance checks. Preserve and bundle both
+  the original and additional upstream MIT notices without changing `LICENSE`.
+
 - Language-labelled Listening/Processing overlay and menu-bar feedback.
 - Optional recording start/stop sounds, off by default and saved locally.
 - Built-in practice text field from setup and the waveform menu.

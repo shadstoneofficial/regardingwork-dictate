@@ -5,7 +5,7 @@
 - Apple Silicon Mac (M1 or later)
 - macOS 14 or later
 - Working built-in or external microphone
-- Physical `fn` / globe key
+- Physical `fn` / globe key, or a supported modifier key in the next release
 
 Intel Macs and non-macOS systems are not supported.
 
@@ -76,7 +76,7 @@ Use non-sensitive example speech. Do not upload recordings or transcripts.
    Listening/Processing labels, and close/reopen it to confirm the text clears.
 2. Confirm the selected language is visible in the overlay. With no speech or
    very low microphone signal, expect a try-again notice, not fabricated text.
-   A brief Fn tap should show a hold-longer notice.
+   A brief hotkey tap should show a cancellation notice without recognition.
 3. Enable **Recording Feedback Sounds**, listen for start/stop cues, restart,
    and confirm the preference persists. Disable it and confirm cues stop.
 4. Press/release Fn again while the first sentence is processing. Confirm no
@@ -96,6 +96,26 @@ Use non-sensitive example speech. Do not upload recordings or transcripts.
    Safari, Messages, Slack, and an Electron app for dropped/reordered characters.
 9. Repeat on multiple displays and in a full-screen app. Confirm the overlay
    does not take keyboard focus or disappear during a new recording.
+
+### Next-release configurable key checks
+
+1. Select every **Push-to-Talk Key** choice. Confirm its checkmark, ready text,
+   setup instructions and practice instructions agree. Restart and confirm the
+   saved choice survives; old configuration files must still default to Fn.
+2. Test left and right sides separately on Apple and third-party USB/Bluetooth
+   keyboards. The opposite side alone must not record; release must end capture.
+3. Tap for under 0.3 seconds and combine the selected key with another modifier,
+   including Fn. Confirm no transcript is produced and the next clean hold works.
+4. Test normal keyboard shortcuts and typing. A modifier-only listener cannot
+   identify letter shortcuts: pick an otherwise unused side-specific modifier.
+5. While listening or processing, confirm key selection is disabled and extra
+   gestures do not cancel an in-flight sentence. Change key while idle and confirm
+   no old-key release starts or ends a new recording.
+6. Test sleep/wake, keyboard disconnect/reconnect, permissions revocation,
+   multiple monitors and closed-lid operation with a working external microphone.
+   This change does not claim to resolve upstream's open clamshell issue.
+7. Run CLI help and an invalid `--hotkey` value without recording. A valid CLI
+   override must not save itself; choosing a key in the menu is an explicit save.
 
 macOS keyboard-event posting cannot confirm that a receiving app accepted the
 text. Successful results are not retained for retry; record app-specific

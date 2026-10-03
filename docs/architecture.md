@@ -13,8 +13,8 @@ recording, cloud transcription, or post-processing service.
 ## Runtime flow
 
 ```text
-fn down → destination snapshot → AudioCapture → in-memory PCM → Listening overlay
-fn up   → signal assessment → WhisperKitTranscriber → TranscriptSanitizer
+hotkey down → destination snapshot → AudioCapture → in-memory PCM → Listening overlay
+hotkey up   → gesture/signal assessment → WhisperKitTranscriber → TranscriptSanitizer
               → original destination unchanged/editable → TextInjector
               → destination blocked/changed → temporary recovery → explicit Copy
 ```
@@ -24,6 +24,12 @@ fn up   → signal assessment → WhisperKitTranscriber → TranscriptSanitizer
 events. `AudioCapture` uses `AVAudioEngine`. `RecordingOverlay` and
 `MenuBarController` are AppKit/SwiftUI surfaces. `TextInjector` posts Unicode
 keyboard events with Core Graphics.
+
+`HotkeyKey` identifies Fn or a side-specific Option/Command/Control/Shift key.
+`Gesture` cancels sub-0.3-second taps and modifier chords without transcribing.
+The menu saves the selected key in `AppConfig`; CLI can override the initial
+selection without saving. Key changes are disabled during a recording or
+transcription. Modifier-only monitoring cannot inspect letter shortcuts.
 
 `DictationSession` accepts one recording/transcription at a time and rejects
 stale completions. `TextDestination` reads Accessibility identity, editability,

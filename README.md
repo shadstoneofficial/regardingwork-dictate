@@ -149,11 +149,31 @@ Example:
   "overlay": true,
   "debug_hotkey": false,
   "dump_wav": false,
-  "feedback_sounds": false
+  "feedback_sounds": false,
+  "hotkey": "fn"
 }
 ```
 
 Command-line flags take precedence over matching configuration values.
+
+### Choose a push-to-talk key (next release)
+
+The waveform menu's **Push-to-Talk Key** offers **fn / Globe** (default), or
+the left/right Option, Command, Control, and Shift keys. The choice applies
+without restarting and is saved for next launch. Setup and practice instructions
+show the selected key. This is under review, not included in the v0.1.4 installer.
+
+For external keyboards that do not send Fn to macOS, try **Right Option**.
+Hold the key alone for at least 0.3 seconds while speaking, then release.
+Short taps and holds with another modifier are cancelled without recognition.
+The app observes modifier changes only, not ordinary typed keys; it cannot
+detect every shortcut using a letter. Choose a key you do not normally hold
+while typing. This is not a fix for unavailable microphones in clamshell mode.
+
+Developers can use `regardingwork-dictate run --hotkey right-option` as an
+initial, non-persistent override. An explicit menu choice replaces the override
+and saves that choice. Missing `hotkey` values in old configurations use Fn;
+invalid names produce a visible configuration error instead of a silent change.
 
 ## Verification
 
