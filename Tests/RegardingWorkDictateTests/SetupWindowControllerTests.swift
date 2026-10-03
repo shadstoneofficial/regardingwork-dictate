@@ -4,6 +4,19 @@ import XCTest
 
 @MainActor
 final class SetupWindowControllerTests: XCTestCase {
+    func testSelectedKeyAppearsInSetupAndPractice() {
+        _ = NSApplication.shared
+        let setup = SetupWindowController()
+        setup.showReady(autoDismiss: false, done: {}, hotkey: .rightOption)
+        XCTAssertTrue(textFields(in: setup.window?.contentView).contains { $0.stringValue.contains("hold right ⌥") })
+        setup.closeAndReturnToMenuBar()
+        let practice = PracticeWindowController()
+        practice.present(language: .thai, hotkey: .leftControl)
+        XCTAssertTrue(textFields(in: practice.window?.contentView).contains { $0.stringValue.contains("Hold left ⌃") })
+        practice.setHotkey(.rightShift)
+        XCTAssertTrue(textFields(in: practice.window?.contentView).contains { $0.stringValue.contains("Hold right ⇧") })
+        practice.close()
+    }
     func testReadyWindowOffersPracticeWithoutRequiringTerminal() {
         _ = NSApplication.shared
         let controller = SetupWindowController()

@@ -7,21 +7,27 @@ import Foundation
 /// Requires Accessibility permission. If the tap fails to register, callers
 /// will see an error from `start()`.
 final class HotkeyMonitor {
-    enum Event { case pressed, released }
+    enum Event: Equatable { case pressed, released, cancelled }
     enum HotkeyError: Error { case tapCreateFailed }
 
-    /// Mask of the modifier we treat as the hotkey. Fn = `.maskSecondaryFn`.
-    private let mask: CGEventFlags
+    private(set) var key: HotkeyKey
     private let debug: Bool
     private var onEvent: ((Event) -> Void)?
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var isPressed = false
+    private var gesture = Gesture()
     fileprivate var tapForRecovery: CFMachPort? { tap }
 
-    init(mask: CGEventFlags = .maskSecondaryFn, debug: Bool = false) {
-        self.mask = mask
+    init(key: HotkeyKey = .fn, debug: Bool = false) {
+        self.key = key
         self.debug = debug
+    }
+
+    func setKey(_ key: HotkeyKey) {
+        guard self.key != key else { return }
+        let action = gesture.reset()
+        self.key = key
+        if let action { emit(action) }
     }
 
     func start(onEvent: @escaping (Event) -> Void) throws {
@@ -73,6 +79,7 @@ final class HotkeyMonitor {
         tap = nil
         runLoopSource = nil
         onEvent = nil
+        _ = gesture.reset()
     }
 
     fileprivate func handle(type: CGEventType, event: CGEvent) {
@@ -85,10 +92,36 @@ final class HotkeyMonitor {
                 ))
         }
         guard type == .flagsChanged else { return }
-        let pressed = event.flags.contains(mask)
-        guard pressed != isPressed else { return }
-        isPressed = pressed
-        onEvent?(pressed ? .pressed : .released)
+        let keycode = event.getIntegerValueField(.keyboardEventKeycode)
+        guard let input = Self.input(keycode: keycode, flags: event.flags, key: key, held: gesture.isHeld) else { return }
+        if let action = gesture.handle(input, at: ProcessInfo.processInfo.systemUptime) {
+            emit(action)
+        }
+    }
+
+    private func emit(_ action: Gesture.Action) {
+        switch action {
+        case .start: onEvent?(.pressed)
+        case .transcribe: onEvent?(.released)
+        case .cancel: onEvent?(.cancelled)
+        }
+    }
+
+    // Adapted from upstream a67e7f3. Side-specific keys share one flag bit.
+    static let modifierKeycodes: Set<Int64> = [54, 55, 56, 58, 59, 60, 61, 62, 63]
+    static let chordFlags: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand, .maskSecondaryFn]
+
+    static func input(keycode: Int64, flags: CGEventFlags, key: HotkeyKey, held: Bool) -> Gesture.Input? {
+        let flagSet = flags.contains(key.flag)
+        if held {
+            if !flagSet { return .hotkeyUp }
+            if key != .fn, keycode == key.keycode { return .hotkeyUp }
+            if keycode != key.keycode, modifierKeycodes.contains(keycode) { return .otherModifier }
+            return nil
+        }
+        guard flagSet, key == .fn || keycode == key.keycode else { return nil }
+        let others = flags.intersection(chordFlags).subtracting(key.flag)
+        return .hotkeyDown(othersHeld: !others.isEmpty)
     }
 }
 

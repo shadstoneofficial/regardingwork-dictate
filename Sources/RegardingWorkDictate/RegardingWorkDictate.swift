@@ -37,6 +37,15 @@ struct Run: ParsableCommand {
     @Option(name: .long, help: "Configuration JSON path. Defaults to Application Support.")
     var config: String?
 
+    @Option(name: .long, help: "Push-to-talk key for this run only: fn, left/right-option, left/right-command, left/right-control, left/right-shift.")
+    var hotkey: String?
+
+    func validate() throws {
+        if let hotkey, HotkeyKey(rawValue: hotkey) == nil {
+            throw ValidationError("Unknown hotkey. Choose: \(HotkeyKey.allCases.map(\.rawValue).joined(separator: ", ")).")
+        }
+    }
+
     func run() throws {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
@@ -47,7 +56,8 @@ struct Run: ParsableCommand {
             dumpWAV: dumpWav,
             noOverlay: noOverlay,
             modelID: model,
-            configurationPath: config
+            configurationPath: config,
+            hotkey: hotkey.flatMap(HotkeyKey.init(rawValue:))
         )
         let coordinator = MainActor.assumeIsolated {
             ApplicationCoordinator(options: options)
@@ -63,11 +73,12 @@ struct Run: ParsableCommand {
 
 struct Doctor: ParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Check microphone, accessibility, and Fn key configuration."
+        abstract: "Check microphone, Accessibility, and the selected push-to-talk key."
     )
 
     func run() throws {
-        let checks = DoctorReport.run()
+        let config = try AppConfig.load(from: AppIdentity.Paths.current.configuration)
+        let checks = DoctorReport.run(hotkey: config.hotkey)
         DoctorReport.print(checks)
         if !DoctorReport.allOK(checks) {
             throw ExitCode(1)

@@ -16,12 +16,13 @@ struct Check {
 }
 
 enum DoctorReport {
-    static func run() -> [Check] {
-        [
+    static func run(hotkey: HotkeyKey = .fn) -> [Check] {
+        var checks = [
             checkMicrophone(),
             checkAccessibility(),
-            checkFnKeyMapping(),
         ]
+        if hotkey == .fn { checks.append(checkFnKeyMapping()) }
+        return checks
     }
 
     static func checkMicrophone() -> Check {
@@ -32,8 +33,8 @@ enum DoctorReport {
         case .notDetermined:
             return Check(
                 name: "microphone",
-                status: .warn("not yet requested — will prompt on first recording"),
-                remediation: "run \(AppIdentity.executableName) and hold Fn once; macOS will prompt"
+                status: .warn("not yet requested — will prompt during app setup"),
+                remediation: "open \(AppIdentity.productName) and allow microphone access in setup"
             )
         case .denied, .restricted:
             return Check(

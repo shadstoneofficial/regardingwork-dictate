@@ -20,6 +20,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         let dumpWAV: Bool
         let overlay: Bool
         let feedbackSounds: Bool
+        let hotkey: HotkeyKey
     }
 
     private let options: RuntimeOptions
@@ -40,6 +41,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private var activeLanguage: TranscriptionLanguage?
     private var dumpWAVEnabled = false
     private var feedbackSoundsEnabled = false
+    private var activeHotkey = HotkeyKey.fn
+    private var hotkeyOverride: HotkeyKey?
     private var session = DictationSession()
     private var destination: TextDestination?
     private var practiceSelection: NSRange?
@@ -50,6 +53,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
 
     init(options: RuntimeOptions) {
         self.options = options
+        self.hotkeyOverride = options.hotkey
         super.init()
     }
 
@@ -66,6 +70,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         }
         menuBar.onPractice = { [weak self] in self?.showPractice() }
         menuBar.onToggleSounds = { [weak self] in self?.toggleFeedbackSounds() }
+        menuBar.onSelectHotkey = { [weak self] in self?.selectHotkey($0) }
         recoveryWindow.onCopy = { [weak self] in self?.copyPendingDictation() }
         recoveryWindow.onDismiss = { [weak self] in
             self?.pendingDictation.clear()
@@ -111,7 +116,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 await requestMicrophoneIfNeeded()
                 requestAccessibilityIfNeeded()
 
-                let checks = DoctorReport.run()
+                let checks = DoctorReport.run(hotkey: settings.hotkey)
                 let failures = DoctorReport.runtimePermissionFailures(checks)
                 guard failures.isEmpty else {
                     transition(to: .permissions(failures))
@@ -171,6 +176,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         }
 
         menuBar.setLanguage(storedConfig.language)
+        activeHotkey = hotkeyOverride ?? storedConfig.hotkey
+        menuBar.setHotkey(activeHotkey)
 
         return ResolvedSettings(
             model: model,
@@ -178,7 +185,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             debugHotkey: options.debugHotkey || storedConfig.debugHotkey,
             dumpWAV: options.dumpWAV || storedConfig.dumpWAV,
             overlay: !options.noOverlay && storedConfig.overlay,
-            feedbackSounds: storedConfig.feedbackSounds
+            feedbackSounds: storedConfig.feedbackSounds,
+            hotkey: activeHotkey
         )
     }
 
@@ -209,7 +217,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         transcriptionTask?.cancel()
         session.cancel()
 
-        let monitor = HotkeyMonitor(debug: settings.debugHotkey)
+        let monitor = HotkeyMonitor(key: settings.hotkey, debug: settings.debugHotkey)
         let capture = AudioCapture()
         let overlay = settings.overlay ? RecordingOverlay() : nil
         if let overlay {
@@ -254,6 +262,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 overlay?.show(.recording, language: language)
                 menuBar.setRecording(true)
                 menuBar.setLanguageSelectionEnabled(false)
+                menuBar.setHotkeySelectionEnabled(false)
                 menuBar.setPracticeEnabled(false)
                 practiceWindow.setStatus("Listening — \(language.displayName)")
                 playFeedbackSound("Tink")
@@ -284,7 +293,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             guard assessment == .usable else {
                 _ = session.complete(sessionID)
                 showNotice(assessment == .tooShort
-                    ? "Hold fn longer while you speak"
+                    ? "Hold \(activeHotkey.shortName) longer while you speak"
                     : "Microphone too quiet — try again")
                 return
             }
@@ -311,6 +320,13 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                     self.showRuntimeFailure("Transcription failed. Choose Try Again to prepare dictation again.")
                 }
             }
+        case .cancelled:
+            // A chord or short tap must never transcribe partial audio. An
+            // ignored press during processing must not cancel that sentence.
+            guard case .listening = session.state else { return }
+            _ = capture.stop()
+            session.cancel()
+            showNotice("Recording cancelled — hold \(activeHotkey.shortName) without other modifiers")
         }
     }
 
@@ -335,7 +351,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             return
         }
         returnToReadyState()
-        practiceWindow.setStatus("Text sent — check your sentence below. Hold fn to try again.")
+        practiceWindow.setStatus("Text sent — check your sentence below. Hold \(activeHotkey.shortName) to try again.")
     }
 
     private func showNotice(_ message: String) {
@@ -383,7 +399,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private func showPractice() {
         guard session.isIdle, case .ready = startupState, let language = activeLanguage else { return }
         setupWindow.closeAndReturnToMenuBar()
-        practiceWindow.present(language: language)
+        practiceWindow.present(language: language, hotkey: activeHotkey)
     }
 
     private func playFeedbackSound(_ name: String) {
@@ -402,6 +418,30 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             let alert = NSAlert()
             alert.messageText = "Couldn’t Save Recording Sounds"
             alert.informativeText = "Please check that the configuration folder is writable and try again."
+            alert.runModal()
+        }
+    }
+
+    private func selectHotkey(_ key: HotkeyKey) {
+        guard session.isIdle, preparationTask == nil else { return }
+        do {
+            var config = try AppConfig.load(from: configurationURL)
+            config.hotkey = key
+            try config.save(to: configurationURL)
+            // An explicit menu choice supersedes the initial CLI override.
+            hotkeyOverride = nil
+            activeHotkey = key
+            monitor?.setKey(key)
+            menuBar.setHotkey(key)
+            practiceWindow.setHotkey(key)
+            if case .ready = startupState {
+                returnToReadyState()
+                if setupWindow.window?.isVisible == true { renderStartupState(autoDismissReady: false) }
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn’t Save Push-to-Talk Key"
+            alert.informativeText = "The previous key is still selected. Check that the configuration folder is writable and try again."
             alert.runModal()
         }
     }
@@ -427,6 +467,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         if let activeModelID {
             menuBar.setReady(modelID: activeModelID)
             menuBar.setLanguageSelectionEnabled(true)
+            menuBar.setHotkeySelectionEnabled(true)
             menuBar.setPracticeEnabled(true)
         }
     }
@@ -482,6 +523,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private func transition(to state: StartupState) {
         startupState = state
         menuBar.setPracticeEnabled(false)
+        menuBar.setHotkeySelectionEnabled(false)
 
         switch state {
         case .checking:
@@ -497,6 +539,7 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             menuBar.setReady(modelID: modelID)
             menuBar.setLanguageSelectionEnabled(true)
             menuBar.setPracticeEnabled(true)
+            menuBar.setHotkeySelectionEnabled(true)
         case .failed:
             menuBar.setNeedsAttention("setup")
             menuBar.setLanguageSelectionEnabled(true)
@@ -533,7 +576,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 practice: { [weak self] in
                     UserDefaults.standard.set(true, forKey: "hasCompletedFirstLaunch")
                     self?.showPractice()
-                }
+                },
+                hotkey: activeHotkey
             )
 
         case .failed(let message):
