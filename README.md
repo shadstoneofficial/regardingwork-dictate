@@ -45,7 +45,7 @@ text. The first switch to Thai downloads approximately 1.6 GB of on-device
 model data, so preparation can take a few minutes. Audio and transcripts still
 remain on the Mac; only the model is downloaded.
 
-### Safer text insertion (next release)
+### Safer text insertion (v0.1.5+)
 
 Finish one sentence before starting another. Dictate checks that the original
 text field and cursor selection are still selected before sending text. If they
@@ -56,10 +56,22 @@ contents may be retained or synced by macOS or other apps. Successful results
 are not kept for recovery; apps that silently reject keyboard events still need
 manual compatibility testing.
 
-Practice text clears when its window closes. These improvements are in source
-for the next release; the published v0.1.4 installer does not include them yet.
+Practice text clears when its window closes. These improvements and configurable
+modifier keys are included in the published v0.1.5 installer.
 See [the improvement roadmap](docs/IMPROVEMENT_ROADMAP.md) for implemented scope,
 future work, and acceptance checks.
+
+### Model preparation progress (next release)
+
+The source under review shows real model-file download percentages, followed
+by a distinct loading phase. Unknown progress stays indeterminate; downloaded
+100% does not mean dictation is ready. Updates do not reopen a closed window.
+
+Choose **Cancel** to stop preparation. Some loading operations cannot stop
+immediately: **Stopping model preparation** remains until they unwind, then
+**Try Again** becomes available. Download/load failures also offer **Try Again**.
+Cached files are kept; byte-level resume is not guaranteed. No audio is captured
+during preparation. This feature is not included in v0.1.5 yet.
 
 ## Build and run
 
@@ -73,7 +85,7 @@ swift build -c release
 For a local unsigned app bundle:
 
 ```sh
-VERSION=0.1.4-dev ./scripts/build-app.sh
+VERSION=0.1.6-dev ./scripts/build-app.sh
 open "dist/RegardingWork Dictate.app"
 ```
 
@@ -91,8 +103,8 @@ stapling, and the verification gates in [SECURITY.md](SECURITY.md).
 ## Install the signed release
 
 The current supported pilot release is
-[v0.1.4](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.4).
-Release v0.1.3 remains available for rollback. Release v0.1.0 is retained for
+[v0.1.5](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.5).
+Release v0.1.4 remains available for rollback. Release v0.1.0 is retained for
 history but is superseded because it could launch without showing visible setup
 or recovery state.
 
@@ -106,7 +118,7 @@ verifies SHA-256, the bundle identifier, code signature, and Gatekeeper
 acceptance, then installs the app:
 
 ```sh
-./scripts/install.sh 0.1.4
+./scripts/install.sh 0.1.5
 ```
 
 Only install assets attached to an approved GitHub release. The repository's
@@ -156,12 +168,12 @@ Example:
 
 Command-line flags take precedence over matching configuration values.
 
-### Choose a push-to-talk key (next release)
+### Choose a push-to-talk key (v0.1.5+)
 
 The waveform menu's **Push-to-Talk Key** offers **fn / Globe** (default), or
 the left/right Option, Command, Control, and Shift keys. The choice applies
 without restarting and is saved for next launch. Setup and practice instructions
-show the selected key. This is under review, not included in the v0.1.4 installer.
+show the selected key. This is included in the v0.1.5 installer.
 
 For external keyboards that do not send Fn to macOS, try **Right Option**.
 Hold the key alone for at least 0.3 seconds while speaking, then release.
@@ -181,7 +193,7 @@ invalid names produce a visible configuration error instead of a silent change.
 swift build -c release
 swift test
 .build/release/regardingwork-dictate --help
-VERSION=0.1.4-dev ./scripts/build-app.sh
+VERSION=0.1.6-dev ./scripts/build-app.sh
 ```
 
 Manual microphone, hotkey, Accessibility, overlay, and text-injection checks

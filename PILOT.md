@@ -67,7 +67,7 @@ each pilot Mac:
 19. Upgrade the signed app in place and repeat the permission, language, and
     login-item checks.
 
-### Next-release confidence checks
+### Confidence regression checks (v0.1.5+)
 
 Use non-sensitive example speech. Do not upload recordings or transcripts.
 
@@ -97,7 +97,7 @@ Use non-sensitive example speech. Do not upload recordings or transcripts.
 9. Repeat on multiple displays and in a full-screen app. Confirm the overlay
    does not take keyboard focus or disappear during a new recording.
 
-### Next-release configurable key checks
+### Configurable key regression checks (v0.1.5+)
 
 1. Select every **Push-to-Talk Key** choice. Confirm its checkmark, ready text,
    setup instructions and practice instructions agree. Restart and confirm the
@@ -123,6 +123,33 @@ compatibility limitations without adding transcript history.
 
 Secure password fields may reject injected text; record that as a platform
 constraint, not a reason to broaden Accessibility event capture.
+
+### Model preparation progress checks (next release)
+
+Use a dedicated pilot account/cache for a first download; do not delete another
+user's cache as a shortcut.
+
+1. Start with a new model: unknown progress must be indeterminate, then measured
+   whole percentages appear in setup and the menu. At 100% transfer, loading
+   follows; recording is unavailable until the model actually becomes ready.
+   Visually inspect the labels, full-width progress bar and Cancel button for
+   clipping/contrast in light and dark appearance on the actual signed app.
+2. Cancel during transfer and loading. Stopping must remain until the operation
+   unwinds; no overlapping retry or activation occurs. Try Again then prepares
+   the selected model/language afresh. Cached files are not deleted.
+3. Interrupt the network and retry after restoring it. Do not assume every
+   partially downloaded byte can be resumed.
+4. Test cached startup, including offline startup, with the pinned library.
+   Record provider/cache limitations; this change does not claim an offline fix.
+5. Close setup during preparation: updates must not reopen it or steal focus.
+   Reopen from the menu and confirm the current phase/percentage is shown.
+6. Change English/Thai after retry, quit/reopen during preparation, and verify
+   clean recovery. Late events must not overwrite Ready/Cancelled/a new attempt.
+7. Verify no audio capture or transcript logs during preparation, and repeat
+   signed upgrade, permissions, physical input and login-item regression tests.
+
+Automated tests use synthetic progress/UI actions, not real downloads or Core ML
+cancellation. These manual pilot cases remain required before distribution.
 
 ## Uninstall
 
