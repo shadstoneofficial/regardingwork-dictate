@@ -16,7 +16,8 @@ actor WhisperKitTranscriber: Transcriber {
     /// Loads the model into memory; downloads first if not already on disk.
     /// Call once at startup so the first hotkey press isn't blocked on model
     /// download/load.
-    func warmUp() async throws {
+    func warmUp(progress: (@Sendable (ModelPreparationEvent) -> Void)? = nil) async throws {
+        try Task.checkCancellation()
         if pipeline != nil { return }
         guard let whisperKitID = model.whisperKitID else {
             throw TranscriberError.missingEngineID
@@ -24,14 +25,33 @@ actor WhisperKitTranscriber: Transcriber {
         let modelDirectory = AppIdentity.Paths.current.models
         try SecureFiles.createPrivateDirectory(modelDirectory)
         FileHandle.standardError.write(Data("loading \(model.id)...\n".utf8))
+        // Adapt upstream's explicit download callback (35536e5) without changing
+        // our model provider, cache location, dependency version or language.
+        try Task.checkCancellation()
+        progress?(.downloading(nil))
+        let folder = try await WhisperKit.download(
+            variant: whisperKitID,
+            downloadBase: modelDirectory
+        ) { transfer in
+            progress?(.downloading(transfer.fractionCompleted))
+        }
+        try Task.checkCancellation()
+        progress?(.loading)
         let config = WhisperKitConfig(
             model: whisperKitID,
             downloadBase: modelDirectory,
+            modelFolder: folder.path,
             verbose: false,
             prewarm: true,
-            load: true
+            load: true,
+            download: false
         )
-        pipeline = try await WhisperKit(config)
+        let loaded = try await WhisperKit(config)
+        if Task.isCancelled {
+            await loaded.unloadModels()
+            throw CancellationError()
+        }
+        pipeline = loaded
         FileHandle.standardError.write(Data("✓ \(model.id) ready\n".utf8))
     }
 

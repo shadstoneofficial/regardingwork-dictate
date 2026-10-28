@@ -9,6 +9,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         case checking
         case permissions([Check])
         case preparing(modelID: String, displayName: String)
+        case cancellingPreparation
+        case preparationCancelled
         case ready(modelID: String)
         case failed(String)
     }
@@ -31,6 +33,8 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     private let recoveryWindow = RecoveryWindowController()
     private var startupState: StartupState = .checking
     private var preparationTask: Task<Void, Never>?
+    private var modelPreparation = ModelPreparationSession()
+    private var isTerminating = false
     private var signalSource: DispatchSourceSignal?
 
     private var monitor: HotkeyMonitor?
@@ -98,22 +102,25 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     private func beginPreparation() {
-        guard preparationTask == nil, session.isIdle else { return }
+        guard preparationTask == nil, session.isIdle, let attemptID = modelPreparation.begin() else { return }
         preparationTask = Task { [weak self] in
             guard let self else { return }
-            await self.prepare()
+            await self.prepare(attemptID: attemptID)
+            self.modelPreparation.finish(attemptID)
             self.preparationTask = nil
         }
     }
 
-    private func prepare() async {
+    private func prepare(attemptID: UUID) async {
         transition(to: .checking)
 
         do {
             let settings = try resolveSettings()
+            try Task.checkCancellation()
 
             if !options.skipDoctor {
                 await requestMicrophoneIfNeeded()
+                try Task.checkCancellation()
                 requestAccessibilityIfNeeded()
 
                 let checks = DoctorReport.run(hotkey: settings.hotkey)
@@ -133,13 +140,39 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
                 model: settings.model,
                 language: settings.language
             )
-            try await transcriber.warmUp()
+            try await transcriber.warmUp { [weak self] event in
+                Task { @MainActor in self?.updateModelPreparation(event, attemptID: attemptID) }
+            }
+            try Task.checkCancellation()
             try startRuntime(transcriber: transcriber, settings: settings)
 
             transition(to: .ready(modelID: settings.model.id))
         } catch {
-            transition(to: .failed(Self.userFacingMessage(for: error)))
+            guard !isTerminating else { return }
+            if Task.isCancelled {
+                transition(to: .preparationCancelled)
+            } else {
+                transition(to: .failed(Self.userFacingMessage(for: error)))
+            }
         }
+    }
+
+    private func updateModelPreparation(_ event: ModelPreparationEvent, attemptID: UUID) {
+        guard case .preparing(_, let name) = startupState,
+              modelPreparation.accept(event, for: attemptID) else { return }
+        menuBar.setPreparationProgress(modelPreparation.progress)
+        setupWindow.updateModelPreparation(name: name, progress: modelPreparation.progress) { [weak self] in
+            self?.cancelModelPreparation()
+        }
+    }
+
+    private func cancelModelPreparation() {
+        guard case .preparing = startupState,
+              let id = modelPreparation.attemptID, modelPreparation.cancel(id) else { return }
+        preparationTask?.cancel()
+        // Do not start a retry until the old operation unwinds: Core ML cannot
+        // always stop immediately, and overlapping large loads can exhaust RAM.
+        transition(to: .cancellingPreparation)
     }
 
     private func resolveSettings() throws -> ResolvedSettings {
@@ -535,6 +568,12 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
         case .preparing(let modelID, _):
             menuBar.setPreparing(modelID: modelID)
             menuBar.setLanguageSelectionEnabled(false)
+        case .cancellingPreparation:
+            menuBar.setNeedsAttention("stopping model preparation…")
+            menuBar.setLanguageSelectionEnabled(false)
+        case .preparationCancelled:
+            menuBar.setNeedsAttention("model preparation cancelled")
+            menuBar.setLanguageSelectionEnabled(true)
         case .ready(let modelID):
             menuBar.setReady(modelID: modelID)
             menuBar.setLanguageSelectionEnabled(true)
@@ -561,7 +600,15 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
             )
 
         case .preparing(_, let displayName):
-            setupWindow.showPreparingModel(name: displayName)
+            setupWindow.showPreparingModel(name: displayName, progress: modelPreparation.progress) { [weak self] in
+                self?.cancelModelPreparation()
+            }
+
+        case .cancellingPreparation:
+            setupWindow.showStoppingPreparation()
+
+        case .preparationCancelled:
+            setupWindow.showPreparationCancelled { [weak self] in self?.beginPreparation() }
 
         case .ready:
             let hasCompletedFirstLaunch = UserDefaults.standard.bool(
@@ -643,6 +690,9 @@ final class ApplicationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        isTerminating = true
+        if let id = modelPreparation.attemptID { _ = modelPreparation.cancel(id) }
+        preparationTask?.cancel()
         monitor?.stop()
         capture?.stop()
         transcriptionTask?.cancel()

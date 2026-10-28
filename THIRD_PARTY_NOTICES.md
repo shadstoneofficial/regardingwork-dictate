@@ -9,6 +9,8 @@ code from the project's current Humanitas Labs upstream (`a67e7f3`, reviewed
 against `0eb4708`). Its complete additional MIT notice is in
 [docs/licenses/PARROT_UPSTREAM_MIT.txt](docs/licenses/PARROT_UPSTREAM_MIT.txt).
 Both the original license and this notice are included in built app resources.
+Model-preparation progress also adapts upstream `35536e5`'s download callback
+pattern under the same retained MIT notices. No dependency versions changed.
 
 Swift Package Manager resolves the versions recorded in `Package.resolved`.
 The dependency licenses inspected for this revision are:
