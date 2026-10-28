@@ -1,115 +1,100 @@
 # RegardingWork Dictate improvement roadmap
 
-Updated: 2026-10-03. Current published release: v0.1.4. This document records the
-agreed priorities, implementation scope, and verification needed before the
-next signed release.
+Updated: **2026-10-28**. This is the working backlog and release-gate checklist.
+Latest published release verified on GitHub:
+[v0.1.5](https://github.com/shadstoneofficial/regardingwork-dictate/releases/tag/v0.1.5),
+published 2026-10-03 from `7e4774e`. Published release metadata does not establish
+that every hardware/manual case below has been tested.
 
-## Next release: everyday confidence
+## Completed and included in v0.1.5
 
-Users should know when Dictate is listening, have an easy way to practice, and
-avoid losing a sentence or sending it into the wrong application. The following
-three priorities are implemented on `agent/dictation-confidence` for review.
-They are not yet in a published installer.
+- Language-labelled Listening/Processing feedback and opt-in recording sounds.
+- Built-in practice field; practice text clears on close.
+- Single-session dictation, stale-completion protection and Unicode event chunks.
+- Original app/field/selection checks and explicit, memory-only recovery for
+  blocked insertion. Recovery expires after 60 seconds and never becomes history.
+- Configurable Fn or side-specific Option/Command/Control/Shift push-to-talk keys,
+  short-tap/chord cancellation, saved selection and matching instructions.
 
-### 1. Clear recording feedback
+These changes were merged through PRs #6 and #7. They are no longer awaiting
+merge. English/Thai selection and Start at Login shipped in earlier versions.
 
-- The overlay says **Listening — English/Thai**, then **Processing —
-  English/Thai**, alongside the waveform or spinner.
-- Menu-bar status and colour reflect listening and processing.
-- **Recording Feedback Sounds** offers start/stop cues. It is off by default
-  and saved in configuration as `feedback_sounds`.
-- A very brief key tap produces a cancellation message with the configurable
-  key filter. Very low microphone
-  signal produces a try-again message without invoking recognition.
-- An empty recognition result produces a visible notice rather than silently
-  disappearing.
-- These signal checks do not claim to identify speech; microphone quality and
-  background noise still affect recognition.
+## Active work: model preparation progress and control
 
-### 2. Built-in practice box
+Implemented for review on `agent/model-preparation-progress`; **not in the
+published v0.1.5 installer**:
 
-- **Try Dictation** appears in the ready window and **Try Dictation…** in the
-  waveform menu.
-- A focused, editable practice field explains holding and releasing Fn and
-  shows the current language and recording state.
-- Practice uses the normal capture, transcription, and keyboard-insertion path.
-- Its contents are held in memory while open and cleared when closed; there is
-  no saved practice history or undo archive.
-- If the user changes focus or moves the practice cursor before recognition
-  completes, the result goes to recovery instead of being inserted elsewhere.
+- Show real, whole-percentage model-file download progress in setup and the menu.
+- Keep unknown progress indeterminate instead of inventing a percentage.
+- Show a separate loading phase after transfer. Downloaded 100% does not mean
+  Core ML has loaded/compiled the model or that dictation is ready.
+- Ignore duplicate, backward, invalid and late progress callbacks.
+- Offer Cancel, an honest stopping state, and Try Again once the old operation
+  finishes. Some model operations cannot stop immediately; no overlapping retry
+  starts while they unwind. Late events cannot update a later attempt.
+- Keep cached files, existing model selection, explicit English/Thai decoding,
+  private paths and dependency versions. Progress updates do not reopen or
+  activate a closed setup window. No audio is recorded during preparation.
 
-### 3. Protection against lost or misplaced text
+Adapted from upstream's existing explicit-download progress pattern (`35536e5`),
+with product-specific cancellation and progress guards. No automatic retries,
+ETA, guaranteed byte-level resume, microphone selector or recognition-accuracy
+improvement is claimed by this change.
 
-- Only one recording/transcription session is accepted at a time. Extra Fn
-  presses during processing are ignored until that sentence completes.
-- Session IDs reject duplicate or stale completions.
-- Before recording, Dictate captures the original application, focused editable
-  field, and selection range where available. It reads identity/selection
-  metadata, not the field's text.
-- Before insertion, it checks the same application, field, editability, and
-  selection. An unknown, secure, changed, or unavailable field uses recovery.
-- Keyboard events are prepared before posting, and UTF-16 surrogate pairs are
-  kept together so emoji are not split across events.
-- The recovery window offers **Copy Text**. Only a blocked result is kept, in
-  memory, for up to 60 seconds. Closing the window, copying it, changing
-  languages, starting a new dictation, or quitting clears it from the app.
-- Copying is explicit and replaces the clipboard. The clipboard and destination
-  application's retention/sync behaviour are outside Dictate's control.
-- Posting keyboard events does not prove that another app accepted them. Apps
-  with unusual Accessibility implementations may require the recovery path;
-  secure inputs are not bypassed. Successful results are not retained for later
-  recovery.
+## Remaining work, in priority order
 
-## Subsequent improvements
-
-The table separates further work under review from deferred work. None is in
-the published v0.1.4 installer.
-
-| Priority | Improvement | Intended outcome and acceptance |
+| Priority | Work item | Acceptance before shipping |
 | --- | --- | --- |
-| 4 | Configurable modifier keys; toggle deferred | Modifier-only push-to-talk is implemented on `agent/upstream-hotkeys`, adapted from upstream and stacked on the confidence PR. Physical-key verification is pending. Toggle remains a separate design decision requiring a duration cap and missed-release recovery. |
-| 5 | Thai accuracy and local vocabulary | Collect Snook's non-sensitive examples of names, terminology, punctuation, and mixed Thai/English speech. Establish a baseline before testing optional local vocabulary hints. Ship only measured improvements. |
-| 6 | Model progress and microphone selection | Show real download progress and retries; select/test a microphone. Test interrupted downloads, offline restarts, Bluetooth disconnects, and device changes. |
-| 7 | In-app update checks | Let users deliberately check for updates and install a verified, signed release. Validate artifact integrity, bundle identity, signature, and Gatekeeper before replacing the app. |
+| 1 | Model preparation pilot | Exercise interrupted transfer, failure/retry, cancellation during transfer and loading, reopening setup, cold/cache-hit startup and cached offline startup. Verify no late event changes a ready app. |
+| 2 | Thai accuracy baseline and local vocabulary | Use Snook's consented, non-sensitive Thai names, numbers, terms and mixed-language examples locally. Measure the baseline before choosing dictionary replacement or optional prompts. Never commit or upload her speech/text. |
+| 3 | Microphone selection and diagnostics | Choose and remember a stable device UID; distinguish missing/unavailable input from low signal. Test USB/Bluetooth route changes, unplug/replug and closed-lid use. Never silently switch microphones contrary to the selected policy. |
+| 4 | Local vocabulary implementation | Review upstream's dictionary engine and open editor PR #59 first. Specify Thai/English matching, replacement boundaries, invalid-file handling, private storage and removal. Ship measured improvements, not an untested accuracy promise. |
+| 5 | Verified in-app update checks | Use our own signed update feed and key, explicit network/privacy disclosure, dependency/license review, bundle/signature/integrity verification and rollback tests. Never import upstream's production updater identity or feed. |
+| 6 | Optional toggle recording | Separate safety design: visible recording state, hard duration cap, cancellation, sleep/permission/device-change recovery, no accidental persistent recording. Hold-to-talk remains the default. |
 
-## Verification and release gate
+Microphone selection, vocabulary and updater work are not implemented by the
+current branch. Automatic language detection and wholesale engine integration
+also remain separate decisions; explicit Thai/English stays unchanged.
 
-Automated coverage includes session sequencing, stale completion rejection,
-very short/quiet audio, bounded recovery lifetime, changed app/field/selection,
-unavailable fields, Unicode event chunking, opt-in sound configuration, and
-practice/recovery UI actions and text clearing.
+## Upstream decisions
 
-Run:
+See [the 2026-10-28 upstream review](UPSTREAM_REVIEW_2026-10-28.md).
+Upstream's default branch is unchanged since our earlier review, but the new
+v0.2.4 tag and `develop` contain an engine/app library split. Directly linking it
+would currently share upstream-branded paths/settings and needs a dedicated
+identity/privacy/configuration review. We have not imported it or upgraded
+WhisperKit. Our upstream contribution PR #61 is still open/draft as of this review.
+
+## Verification and release gates
+
+Automated tests cover progress normalization/coalescing, phase ordering,
+cancel/finish/retry and stale IDs, UI actions, determinate versus loading state,
+closed-window behavior, and the existing dictation/configuration/privacy logic.
+
+Verified on 2026-10-28: **70 tests passed**, release build and root/run CLI help
+passed, and an unsigned arm64 `0.1.6-dev` app bundle built successfully. No real
+model download, microphone access, signing or production installation was used
+for these checks. AppKit assertions cover values, layout width and actions;
+bitmap previews did not reliably capture native control layers and are not
+accepted as visual validation. Live visual inspection remains a pilot check.
 
 ```sh
 swift test
 swift build -c release
 .build/release/regardingwork-dictate --help
-VERSION=0.1.5-dev DIST=/absolute/path/to/a/new/review-directory ./scripts/build-app.sh
+.build/release/regardingwork-dictate run --help
+VERSION=0.1.6-dev DIST=/absolute/path/to/a/new/review-directory ./scripts/build-app.sh
 git diff --check
 ```
 
-Before distributing v0.1.5, complete the manual cases in [PILOT.md](../PILOT.md),
-including real microphones, physical Fn input, permission prompts, Thai speech,
-focus switching, recovery expiry/copy, external applications, and optional
-sounds. Automated tests do not certify these macOS interactions or recognition
-accuracy.
+Before distribution, complete [PILOT.md](../PILOT.md), including the new model
+preparation cases, physical hotkeys/microphones, permissions, Thai speech,
+external apps, secure fields, recovery, sleep/wake and login-item persistence.
+Automated tests and isolated UI previews do not validate actual downloads,
+Core ML cancellation, microphone capture or recognition accuracy.
 
-Use a reviewed merge followed by a fresh Developer ID signed, notarized, stapled
-DMG/ZIP with checksums. The current v0.1.4 download remains the supported build
-until that release is published. No recordings, dictated text, model downloads,
-or signing material belong in Git.
-
-### Development verification on 2026-10-03
-
-- `swift test`: 46 tests passed.
-- `swift build -c release`: passed.
-- Root and `run --help` CLI smoke tests: passed.
-- Practice and recovery windows: visually reviewed in isolated AppKit previews
-  using non-sensitive example text; previews did not access the microphone.
-- Real speech, permissions, physical Fn input, sound audibility, focus changes
-  in external applications, and recognition quality: pending manual pilot tests.
-
-See [the upstream review](UPSTREAM_REVIEW_2026-10-03.md) before starting the
-remaining items: upstream already has dictionary and updater implementations,
-but they require a separate dependency/privacy/release review before adoption.
+After approved merge, rebuild from the final default-branch commit and use a
+fresh Developer ID signed, notarized and stapled DMG/ZIP with verified checksums.
+Do not silently move published tags or publish a release as part of feature work.
+Keep v0.1.5 available for rollback; never commit models, recordings, transcripts,
+signing material or generated artifacts.

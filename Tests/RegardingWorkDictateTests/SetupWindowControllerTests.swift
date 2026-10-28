@@ -4,6 +4,49 @@ import XCTest
 
 @MainActor
 final class SetupWindowControllerTests: XCTestCase {
+    func testMeasuredDownloadProgressAndLoadingAreDistinct() {
+        _ = NSApplication.shared
+        let controller = SetupWindowController()
+        controller.showPreparingModel(name: "Whisper Test", progress: .downloading(42))
+        let indicator = progressIndicators(in: controller.window?.contentView).first
+        controller.window?.contentView?.layoutSubtreeIfNeeded()
+        XCTAssertEqual(indicator?.style, .bar)
+        XCTAssertGreaterThan(indicator?.frame.width ?? 0, 100)
+        XCTAssertEqual(indicator?.isIndeterminate, false)
+        XCTAssertEqual(indicator?.doubleValue, 42)
+        XCTAssertTrue(textFields(in: controller.window?.contentView).contains { $0.stringValue.contains("42%") })
+        controller.updateModelPreparation(name: "Whisper Test", progress: .loading, cancel: nil)
+        XCTAssertEqual(indicator?.style, .spinning)
+        XCTAssertEqual(indicator?.isIndeterminate, true)
+        XCTAssertFalse(textFields(in: controller.window?.contentView).contains { $0.stringValue.contains("42%") })
+        controller.closeAndReturnToMenuBar()
+    }
+
+    func testPreparationCancelAndRetryActions() {
+        _ = NSApplication.shared
+        let controller = SetupWindowController()
+        var cancelled = false
+        var retried = false
+        controller.showPreparingModel(name: "Whisper Test", cancel: { cancelled = true })
+        buttons(in: controller.window?.contentView).first { $0.title == "Cancel" }?.performClick(nil)
+        XCTAssertTrue(cancelled)
+        controller.showStoppingPreparation()
+        XCTAssertTrue(buttons(in: controller.window?.contentView).allSatisfy { $0.isHidden })
+        controller.showPreparationCancelled { retried = true }
+        XCTAssertFalse(progressIndicators(in: controller.window?.contentView).contains { !$0.isHidden })
+        buttons(in: controller.window?.contentView).first { $0.title == "Try Again" }?.performClick(nil)
+        XCTAssertTrue(retried)
+        controller.closeAndReturnToMenuBar()
+    }
+
+    func testProgressDoesNotReopenClosedSetupWindow() {
+        _ = NSApplication.shared
+        let controller = SetupWindowController()
+        controller.showPreparingModel(name: "Whisper Test")
+        controller.closeAndReturnToMenuBar()
+        controller.updateModelPreparation(name: "Whisper Test", progress: .downloading(55), cancel: nil)
+        XCTAssertEqual(controller.window?.isVisible, false)
+    }
     func testSelectedKeyAppearsInSetupAndPractice() {
         _ = NSApplication.shared
         let setup = SetupWindowController()

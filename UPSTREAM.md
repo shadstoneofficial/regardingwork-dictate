@@ -42,6 +42,11 @@ against `0eb4708`. Its additional Humanitas Labs MIT notice is preserved in
 No dependency versions changed. See the
 [2026-10-03 review](docs/UPSTREAM_REVIEW_2026-10-03.md) for adopted and deferred work.
 
+Model-preparation progress additionally adapts upstream `35536e5`'s explicit
+download callback pattern, retaining our cache, language selection and dependency
+graph. See the latest [2026-10-28 review](docs/UPSTREAM_REVIEW_2026-10-28.md) for
+release/branch changes, engine extraction and pending contribution status.
+
 Then run:
 
 ```sh

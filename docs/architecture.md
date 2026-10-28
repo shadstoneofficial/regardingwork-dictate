@@ -48,6 +48,22 @@ The default model is selected from `ModelRegistry`. `AppConfig` can override
 the model and privacy-safe UI/debug defaults. Command-line options take
 precedence over stored configuration.
 
+## Model preparation
+
+`WhisperKitTranscriber.warmUp` explicitly downloads through the existing
+WhisperKit provider/cache to expose progress, then loads that folder with
+`download: false`. `ModelPreparationSession` normalizes finite fractions to
+whole percentages, coalesces duplicate/backward events, rejects stale attempt
+IDs and prevents an old attempt from updating a ready/cancelled/retried UI.
+Downloading and loading remain separate; no Core ML percentage or ETA is invented.
+
+Cancellation is cooperative. `ApplicationCoordinator` keeps the preparation task
+until it unwinds and shows Stopping before offering retry. A cancelled load
+unloads its new pipeline instead of activating it. No overlapping preparation
+can start. Progress updates change existing UI content without activating it or
+reopening a closed window. Model caches, provider, dependency pins and language
+selection do not change; no audio capture occurs during preparation.
+
 ## Identity and paths
 
 `AppIdentity` is the source of truth:

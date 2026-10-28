@@ -26,6 +26,11 @@ The selected model may be downloaded from WhisperKit's model host. Swift
 dependencies are downloaded during development and CI builds. Those downloads
 do not include microphone audio or transcript text.
 
+Model progress consists of an in-memory phase and transfer percentage only.
+Cancelling preparation does not record audio, clear cached models or create
+transcript history; it waits for the existing operation before permitting retry.
+No service or telemetry endpoint is added.
+
 ## Optional debugging data
 
 Audio dumping is off by default. `run --dump-wav` or `"dump_wav": true` creates

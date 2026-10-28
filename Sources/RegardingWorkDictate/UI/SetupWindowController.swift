@@ -8,6 +8,7 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
     private let detailLabel = NSTextField(wrappingLabelWithString: "")
     private let progressIndicator = NSProgressIndicator()
+    private var downloadProgressWidth: NSLayoutConstraint?
     private let primaryButton = NSButton()
     private let secondaryButton = NSButton()
     private var primaryAction: (() -> Void)?
@@ -16,7 +17,7 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 330),
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 390),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -77,12 +78,54 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
         present()
     }
 
-    func showPreparingModel(name: String) {
+    func showPreparingModel(
+        name: String,
+        progress: ModelPreparationProgress = .checking,
+        cancel: (() -> Void)? = nil
+    ) {
+        updateModelPreparation(name: name, progress: progress, cancel: cancel)
+        present()
+    }
+
+    /// Progress updates must never activate the app or reopen a closed window.
+    func updateModelPreparation(name: String, progress: ModelPreparationProgress, cancel: (() -> Void)?) {
         configure(
             title: "Preparing on-device dictation",
-            message: "Downloading or loading \(name)…",
-            detail: "The first launch can take a few minutes. Audio and transcripts stay on this Mac.",
+            message: "\(name)\n\(progress.message)",
+            detail: "Download progress covers model files only. Loading can take a few minutes afterward. Audio and transcripts stay on this Mac.",
+            showsProgress: true,
+            secondaryTitle: cancel == nil ? nil : "Cancel",
+            secondaryAction: cancel
+        )
+        if case .downloading(let percent?) = progress {
+            progressIndicator.stopAnimation(nil)
+            progressIndicator.style = .bar
+            progressIndicator.isIndeterminate = false
+            progressIndicator.minValue = 0
+            progressIndicator.maxValue = 100
+            progressIndicator.doubleValue = Double(percent)
+            downloadProgressWidth?.isActive = true
+        }
+    }
+
+    func showStoppingPreparation() {
+        configure(
+            title: "Stopping model preparation",
+            message: "Waiting for the current download or model operation to stop…",
+            detail: "Some on-device loading operations must finish before they can be stopped. No audio is being recorded.",
             showsProgress: true
+        )
+        present()
+    }
+
+    func showPreparationCancelled(retry: @escaping () -> Void) {
+        configure(
+            title: "Model preparation cancelled",
+            message: "Choose Try Again when you’re ready to continue setup.",
+            detail: "Cached model files have not been deleted. No audio is being recorded.",
+            showsProgress: false,
+            primaryTitle: "Try Again",
+            primaryAction: retry
         )
         present()
     }
@@ -158,6 +201,7 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
         progressIndicator.style = .spinning
         progressIndicator.controlSize = .regular
         progressIndicator.isIndeterminate = true
+        progressIndicator.isDisplayedWhenStopped = true
 
         primaryButton.bezelStyle = .rounded
         primaryButton.keyEquivalent = "\r"
@@ -191,6 +235,7 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
         content.spacing = 16
         content.setHuggingPriority(.defaultLow, for: .horizontal)
         content.translatesAutoresizingMaskIntoConstraints = false
+        downloadProgressWidth = progressIndicator.widthAnchor.constraint(equalTo: content.widthAnchor)
 
         let contentView = NSView()
         contentView.addSubview(content)
@@ -220,11 +265,15 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
         pendingDismissal?.cancel()
         pendingDismissal = nil
 
+        downloadProgressWidth?.isActive = false
+
         titleLabel.stringValue = title
         messageLabel.stringValue = message
         detailLabel.stringValue = detail
 
         if showsProgress {
+            progressIndicator.style = .spinning
+            progressIndicator.isIndeterminate = true
             progressIndicator.isHidden = false
             progressIndicator.startAnimation(nil)
         } else {

@@ -135,6 +135,10 @@ final class MenuBarController {
         setState("preparing on-device model…")
     }
 
+    func setPreparationProgress(_ progress: ModelPreparationProgress) {
+        setState(progress.message)
+    }
+
     func setReady(modelID: String) {
         modelLabel.title = "model: \(modelID)"
         setState(readyStateTitle)

@@ -7,6 +7,20 @@ follows semantic versioning.
 
 ### Added
 
+- Real model-file transfer progress in setup/menu, separate on-device loading,
+  cooperative Cancel/Stopping/Try Again controls and stale-progress guards.
+- Progress-state and AppKit tests, including closed-window behavior and serial
+  retry. Progress updates do not reopen setup or activate the application.
+
+### Documentation
+
+- Refresh roadmap/release status against published v0.1.5 and merged PRs #6/#7;
+  record the October 28 upstream review and defer broad engine integration.
+
+## 0.1.5 - 2026-10-03
+
+### Added
+
 - Adapt selected upstream modifier-key/gesture improvements: configurable
   left/right Option, Command, Control and Shift push-to-talk keys, short-tap and
   modifier-chord cancellation, saved menu preferences, selected-key instructions
